@@ -8,7 +8,9 @@ services:
     rootDir: server
     plan: free
     region: virginia
-    buildCommand: npm install && npm run build
+    # --include=dev: build needs typescript/@types/node/prisma, which npm would
+    # otherwise skip because NODE_ENV=production.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -36,7 +38,7 @@ services:
     name: tania-web
     runtime: static
     rootDir: web
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
