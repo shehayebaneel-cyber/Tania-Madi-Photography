@@ -1,0 +1,50 @@
+# Render Blueprint for Tania Madi Photography.
+# rghome-style: an API (Node/Express/Prisma) + a static web front-end (Vite build).
+# Database is Neon Postgres. Secret env vars are set in the Render dashboard (sync: false).
+services:
+  - type: web
+    name: tania-api
+    runtime: node
+    rootDir: server
+    plan: free
+    region: virginia
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: WEB_URL
+        fromService:
+          type: web
+          name: tania-web
+          property: host
+
+  - type: web
+    name: tania-web
+    runtime: static
+    rootDir: web
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: tania-api
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

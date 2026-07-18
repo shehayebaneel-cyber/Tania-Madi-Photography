@@ -1,0 +1,241 @@
+// Tania Madi Photography — full platform data model. Postgres on Neon.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Editable site content (homepage text, contact, hours, policies) as key/JSON.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  name         String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+model Customer {
+  id           Int              @id @default(autoincrement())
+  email        String           @unique
+  passwordHash String
+  name         String
+  phone        String           @default("")
+  whatsapp     String           @default("")
+  instagram    String           @default("")
+  address      String           @default("")
+  bookings     Booking[]
+  orders       Order[]
+  editing      EditingRequest[]
+  createdAt    DateTime         @default(now())
+}
+
+// A photography/videography service (weddings, newborn, product…).
+model Service {
+  slug           String    @id
+  name           String
+  tagline        String    @default("")
+  description    String    @default("")
+  includes       Json      @default("[]") // string[]
+  durationText   String    @default("")
+  locationText   String    @default("") // studio / outdoor
+  startingPrice  Int? // null => request pricing
+  faqs           Json      @default("[]") // {q,a}[]
+  heroTone       String    @default("g-family")
+  sortOrder      Int       @default(0)
+  isActive       Boolean   @default(true)
+  packages       Package[]
+  createdAt      DateTime  @default(now())
+}
+
+model Package {
+  id            Int      @id @default(autoincrement())
+  serviceSlug   String?
+  service       Service? @relation(fields: [serviceSlug], references: [slug])
+  name          String
+  price         Int?
+  requestPricing Boolean @default(false)
+  durationText  String   @default("")
+  editedPhotos  String   @default("")
+  outfits       String   @default("")
+  features      Json     @default("[]") // string[]
+  deposit       Int      @default(0)
+  deliveryDays  String   @default("")
+  revisions     Int      @default(1)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+}
+
+model PortfolioItem {
+  id          Int      @id @default(autoincrement())
+  category    String // slug: weddings, couples, maternity...
+  title       String   @default("")
+  description String   @default("")
+  tone        String   @default("g-family") // placeholder tone class until real image
+  imageUrl    String   @default("")
+  orientation String   @default("portrait")
+  isFeatured  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  hasConsent  Boolean  @default(true) // client permission to show publicly
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Testimonial {
+  id          Int      @id @default(autoincrement())
+  name        String
+  sessionType String   @default("")
+  text        String
+  rating      Int      @default(5)
+  tone        String   @default("g-couple")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+}
+
+model Booking {
+  id            Int      @id @default(autoincrement())
+  reference     String   @unique
+  serviceSlug   String
+  serviceName   String
+  preferredDate String   @default("")
+  altDate       String   @default("")
+  preferredTime String   @default("")
+  setting       String   @default("") // studio / outdoor
+  locationText  String   @default("")
+  people        String   @default("")
+  withVideo     Boolean  @default(false)
+  packagePref   String   @default("")
+  description   String   @default("")
+  extra         Json     @default("{}") // service-specific fields
+  customerName  String
+  phone         String
+  whatsapp      String   @default("")
+  email         String   @default("")
+  instagram     String   @default("")
+  heardFrom     String   @default("")
+  status        String   @default("NEW") // NEW,CONTACTED,QUOTED,AWAITING_DEPOSIT,CONFIRMED,COMPLETED,CANCELLED,DECLINED,RESCHEDULE
+  adminNotes    String   @default("")
+  quote         Int?
+  deposit       Int?
+  customerId    Int?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProductCategory {
+  slug      String    @id
+  name      String
+  sortOrder Int       @default(0)
+  products  Product[]
+}
+
+model Product {
+  id            Int              @id @default(autoincrement())
+  categorySlug  String
+  category      ProductCategory  @relation(fields: [categorySlug], references: [slug])
+  name          String
+  description   String           @default("")
+  tone          String           @default("g-family")
+  images        Json             @default("[]") // string[]
+  material      String           @default("")
+  style         String           @default("")
+  colors        Json             @default("[]") // string[]
+  sizes         Json             @default("[]") // {label, priceDelta}[]
+  orientation   String           @default("any")
+  glassOption   Boolean          @default(false)
+  mount         String           @default("") // tabletop / wall / both
+  price         Int
+  stock         Int              @default(0)
+  madeToOrder   Boolean          @default(false)
+  prepTime      String           @default("")
+  isActive      Boolean          @default(true)
+  isFeatured    Boolean          @default(false)
+  sortOrder     Int              @default(0)
+  createdAt     DateTime         @default(now())
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  reference     String      @unique
+  customerName  String
+  phone         String
+  email         String      @default("")
+  address       String      @default("")
+  town          String      @default("")
+  note          String      @default("")
+  fulfilment    String      @default("PICKUP") // PICKUP / DELIVERY
+  paymentMethod String      @default("CASH") // CASH, PICKUP, COD, WHISH
+  status        String      @default("NEW")
+  itemsCost     Int         @default(0)
+  editingCost   Int         @default(0)
+  deliveryFee   Int         @default(0)
+  discount      Int         @default(0)
+  total         Int         @default(0)
+  items         OrderItem[]
+  customerId    Int?
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind        String   @default("PRODUCT") // PRODUCT / EDITING
+  productId   Int?
+  name        String
+  options     Json     @default("{}") // {size,color,orientation,finish...}
+  uploadUrl   String   @default("") // customer-uploaded photo (private)
+  needsEditing Boolean @default(false)
+  instructions String  @default("")
+  price       Int
+  qty         Int      @default(1)
+}
+
+model EditingService {
+  slug        String   @id
+  name        String
+  description String   @default("")
+  pricingType String   @default("FIXED") // FIXED, STARTING, COMPLEXITY, QUOTE
+  price       Int? // for FIXED/STARTING
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+}
+
+model EditingRequest {
+  id            Int      @id @default(autoincrement())
+  reference     String   @unique
+  serviceSlug   String
+  serviceName   String
+  complexity    String   @default("BASIC") // BASIC, ADVANCED, COMPLEX, CUSTOM
+  instructions  String   @default("")
+  speed         String   @default("STANDARD") // STANDARD, EXPRESS, URGENT
+  photoCount    Int      @default(1)
+  uploadUrls    Json     @default("[]") // string[] (private)
+  customerName  String
+  phone         String
+  whatsapp      String   @default("")
+  email         String   @default("")
+  deliveryPref  String   @default("")
+  notes         String   @default("")
+  status        String   @default("NEW") // NEW,REVIEW,QUOTED,AWAITING_APPROVAL,AWAITING_PAYMENT,EDITING,PREVIEW,REVISION,APPROVED,DELIVERED,CANCELLED
+  quote         Int?
+  previewUrl    String   @default("")
+  finalUrl      String   @default("")
+  revisionsUsed Int      @default(0)
+  customerId    Int?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
