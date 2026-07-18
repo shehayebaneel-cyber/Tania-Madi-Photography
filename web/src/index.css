@@ -60,8 +60,9 @@ img{max-width:100%;display:block}
 /* photo tone placeholders */
 .ph{position:relative;overflow:hidden;background:var(--sand);isolation:isolate}
 .ph::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(120% 90% at 30% 15%,rgba(255,255,255,.34),transparent 55%),var(--g,linear-gradient(150deg,#ead7d0,#c9a29e 55%,#9c7a7e));opacity:.97}
-.ph::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 70px rgba(80,50,55,.13);pointer-events:none}
-.ph .plabel{position:absolute;left:13px;bottom:11px;z-index:1;font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,251,248,.92);text-shadow:0 1px 8px rgba(60,30,35,.4)}
+.ph-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.ph::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 70px rgba(80,50,55,.16);pointer-events:none;z-index:1}
+.ph .plabel{position:absolute;left:13px;bottom:11px;z-index:2;font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,251,248,.92);text-shadow:0 1px 8px rgba(60,30,35,.55)}
 .g-wed{--g:linear-gradient(150deg,#e0cdcf,#c0a3a8 55%,#8f7076)}
 .g-couple{--g:linear-gradient(150deg,#ecd6c9,#d0a894 55%,#a67f6e)}
 .g-mat{--g:linear-gradient(150deg,#f0dcd7,#d6afaf 55%,#b0888c)}

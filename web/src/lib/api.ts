@@ -28,14 +28,30 @@ export interface Product {
 export interface EditingService { slug: string; name: string; description: string; pricingType: string; price: number | null; }
 export interface Settings { contact?: any; home?: any; [k: string]: any; }
 
-async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(BASE + path, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
-  if (!res.ok) {
-    let msg = "Something went wrong. Please try again.";
-    try { const d = await res.json(); if (d?.error) msg = d.error; } catch { /* ignore */ }
-    throw new Error(msg);
+async function req<T>(path: string, options: RequestInit = {}, retries = 2): Promise<T> {
+  const init: RequestInit = { credentials: "include", headers: { "Content-Type": "application/json" }, ...options };
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(BASE + path, init);
+      if (!res.ok) {
+        let msg = "Something went wrong. Please try again.";
+        try { const d = await res.json(); if (d?.error) msg = d.error; } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      return res.json();
+    } catch (e) {
+      lastErr = e;
+      // Only retry network/cold-start failures on idempotent GETs.
+      const isGet = !options.method || options.method === "GET";
+      if (e instanceof TypeError && isGet && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
   }
-  return res.json();
+  throw lastErr;
 }
 const qs = (o: Record<string, string | undefined>) => {
   const p = new URLSearchParams();

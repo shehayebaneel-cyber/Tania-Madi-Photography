@@ -50,7 +50,7 @@ export default function Product() {
       <div className="wrap sd-grid">
         <div>
           <div className="cmap" style={{ minHeight: 0, aspectRatio: "1", borderRadius: 6, position: "relative", overflow: "hidden" }}>
-            {photo ? <img src={photo.url} alt="Your upload preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Tone tone={p.tone} label={p.category?.name} />}
+            {photo ? <img src={photo.url} alt="Your upload preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Tone tone={p.tone} label={p.category?.name} seed={p.id} w={800} h={800} />}
           </div>
           {photo && <p className="muted center" style={{ fontSize: 12, marginTop: 8 }}>Preview of your photo · Tania reviews every image before printing.</p>}
         </div>

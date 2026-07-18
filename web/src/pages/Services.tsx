@@ -19,7 +19,7 @@ export default function Services() {
           <div className="services">
             {services.map((s, i) => (
               <div key={s.slug} className="svc" onClick={() => nav(`/services/${s.slug}`)} style={{ aspectRatio: "4/5" }}>
-                <Tone tone={s.heroTone} />
+                <Tone tone={s.heroTone} seed={s.slug} />
                 <div className="cap"><span>{String(i + 1).padStart(2, "0")}</span><h3>{s.name}</h3><p style={{ fontSize: 13, color: "rgba(255,251,248,.85)", marginTop: 4 }}>{s.tagline}</p></div>
               </div>
             ))}

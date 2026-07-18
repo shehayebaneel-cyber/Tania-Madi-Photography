@@ -44,7 +44,7 @@ export default function Portfolio() {
           </div>
           {loading ? <div className="spinner" /> : items.length === 0 ? <div className="empty"><h3>No photos in this category yet</h3></div> : (
             <div className="pgrid">
-              {items.map((p, i) => <Tone key={p.id} tone={p.tone} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} onClick={() => setIdx(i)} />)}
+              {items.map((p, i) => <Tone key={p.id} tone={p.tone} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} seed={p.id} onClick={() => setIdx(i)} />)}
             </div>
           )}
         </div>
@@ -56,7 +56,7 @@ export default function Portfolio() {
           onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1); touchX.current = null; }}>
           <button className="cls" aria-label="Close" onClick={(e) => { e.stopPropagation(); setIdx(null); }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
           {items.length > 1 && <span className="count">{idx! + 1} / {items.length}</span>}
-          <Tone tone={cur.tone} className="media" label={cur.category.replace(/-/g, " ")} />
+          <Tone tone={cur.tone} className="media" label={cur.category.replace(/-/g, " ")} seed={cur.id} w={1200} h={800} />
           {items.length > 1 && <>
             <button className="nav prev" aria-label="Previous" onClick={(e) => { e.stopPropagation(); go(-1); }}><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg></button>
             <button className="nav next" aria-label="Next" onClick={(e) => { e.stopPropagation(); go(1); }}><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg></button>

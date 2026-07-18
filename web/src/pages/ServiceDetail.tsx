@@ -16,7 +16,7 @@ export default function ServiceDetail() {
   return (
     <>
       <div className="sd-hero">
-        <Tone tone={s.heroTone} />
+        <Tone tone={s.heroTone} seed={s.slug} w={1400} h={700} />
         <div className="veil" />
         <div className="inner">
           <p className="eyebrow" style={{ color: "var(--gold-soft)" }}>Photography</p>

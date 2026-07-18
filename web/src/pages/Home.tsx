@@ -41,7 +41,7 @@ export default function Home() {
           <div className="services">
             {services.map((s, i) => (
               <div key={s.slug} className="svc" onClick={() => nav(`/services/${s.slug}`)}>
-                <Tone tone={s.heroTone} />
+                <Tone tone={s.heroTone} seed={s.slug} />
                 <div className="cap"><span>{String(i + 1).padStart(2, "0")}</span><h3>{s.name}</h3></div>
               </div>
             ))}
@@ -67,7 +67,7 @@ export default function Home() {
           <div className="sec-head"><div className="divider" /><p className="eyebrow" style={{ marginTop: 16 }}>Selected work</p><h2>A few favourites</h2></div>
           <div className="pgrid">
             {featured.slice(0, 10).map((p, i) => (
-              <Tone key={p.id} tone={p.tone} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} />
+              <Tone key={p.id} tone={p.tone} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} seed={p.id} />
             ))}
           </div>
           <div className="center mt40"><Link className="btn btn-outline" to="/portfolio">Explore full portfolio →</Link></div>
@@ -99,7 +99,7 @@ export default function Home() {
             <div className="sec-head"><div className="divider" /><p className="eyebrow" style={{ marginTop: 16 }}>Kind words</p><h2>Loved by families across Aley</h2></div>
             <div className="tgrid">
               {tms.map((t) => (
-                <div key={t.id} className="tcard"><div className="stars">{"★".repeat(t.rating)}</div><p>"{t.text}"</p><div className="who"><Tone tone={t.tone} className="av" /><div><b>{t.name}</b><span>{t.sessionType}</span></div></div></div>
+                <div key={t.id} className="tcard"><div className="stars">{"★".repeat(t.rating)}</div><p>"{t.text}"</p><div className="who"><Tone tone={t.tone} className="av" seed={t.name} w={80} h={80} /><div><b>{t.name}</b><span>{t.sessionType}</span></div></div></div>
               ))}
             </div>
           </div>
