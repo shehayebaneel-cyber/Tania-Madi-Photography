@@ -78,6 +78,10 @@ img{max-width:100%;display:block}
 .g-weddings{--g:linear-gradient(150deg,#e0cdcf,#c0a3a8 55%,#8f7076)}
 .g-couples{--g:linear-gradient(150deg,#ecd6c9,#d0a894 55%,#a67f6e)}
 .g-gender-reveals{--g:linear-gradient(150deg,#ecdce0,#d0b3bf 55%,#a98c9c)}
+/* product mockups: clean light background, no gradient/vignette */
+.pm{background:#f3f1ec}
+.pm::before,.pm::after{display:none}
+.pm svg{position:absolute;inset:0}
 
 /* header */
 header.site{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line-2)}

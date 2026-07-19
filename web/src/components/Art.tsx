@@ -53,6 +53,53 @@ export function productKeyword(categorySlug?: string) {
   }
 }
 
+function frameColor(colors: string[] = [], name = "") {
+  const s = ((colors[0] || "") + " " + name).toLowerCase();
+  if (s.includes("black")) return { c: "#262626", e: "#111" };
+  if (s.includes("white")) return { c: "#ECECEC", e: "#d4d4d4" };
+  if (s.includes("walnut")) return { c: "#5B3B2A", e: "#3f2a1d" };
+  if (s.includes("gold") || s.includes("champagne")) return { c: "#C7A24E", e: "#a9853a" };
+  if (s.includes("grey") || s.includes("gray") || s.includes("green")) return { c: "#9a978f", e: "#7c7970" };
+  return { c: "#C69A6B", e: "#a97e52" }; // wood / oak / natural / pine / birch
+}
+
+// Clean, reliable product graphics — a stand-in for real product photos.
+export function ProductMock({ category, colors = [], name = "", className = "", style, onClick }: { category?: string; colors?: string[]; name?: string; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
+  const f = frameColor(colors, name);
+  let art: JSX.Element;
+  if (category === "canvas") {
+    art = (<g filter="url(#sh)"><rect x="27" y="22" width="46" height="56" rx="1" fill="#efe3dc" /><rect x="27" y="22" width="46" height="56" fill="url(#cv)" /><rect x="71" y="22" width="2.5" height="56" fill="#d8c8bf" /><rect x="27" y="76" width="46" height="2.5" fill="#e6d7ce" /></g>);
+  } else if (category === "albums") {
+    const cov = frameColor(colors, name).c;
+    art = (<g filter="url(#sh)"><rect x="29" y="22" width="42" height="56" rx="2" fill={cov} /><rect x="29" y="22" width="6" height="56" fill="rgba(0,0,0,.16)" /><rect x="44" y="43" width="18" height="13" rx="1.5" fill="rgba(255,255,255,.45)" /></g>);
+  } else if (category === "prints") {
+    art = (<g filter="url(#sh)" transform="rotate(-2 50 50)"><rect x="30" y="20" width="40" height="54" fill="#fff" /><rect x="33.5" y="23.5" width="33" height="40" fill="#d9d9dc" /></g>);
+  } else if (category === "gifts") {
+    art = (<g filter="url(#sh)"><rect x="31" y="42" width="38" height="30" rx="1" fill={f.c} /><rect x="31" y="35" width="38" height="8" rx="1" fill={f.e} /><rect x="46.5" y="35" width="7" height="37" fill="#C7A24E" /><path d="M50 35c-5-6-13-2-8 3M50 35c5-6 13-2 8 3" fill="none" stroke="#C7A24E" strokeWidth="2.4" /></g>);
+  } else {
+    const ornate = category === "premium-frames";
+    const col = ornate ? { c: "#C7A24E", e: "#a9853a" } : f;
+    art = (<g filter="url(#sh)">
+      <rect x="30" y="12" width="40" height="76" rx="1.5" fill={col.c} stroke={col.e} strokeWidth="0.8" />
+      {ornate && <rect x="33" y="15" width="34" height="70" rx="1" fill="none" stroke="#e6cf94" strokeWidth="0.7" />}
+      <rect x="34.5" y="16.5" width="31" height="67" fill="#fbfbf9" />
+      <rect x="41" y="26" width="18" height="48" fill="#dcdce0" />
+    </g>);
+  }
+  return (
+    <div className={`ph pm ${className}`} style={onClick ? { cursor: "pointer", ...style } : style} onClick={onClick}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+        <defs>
+          <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.4" stdDeviation="1.6" floodColor="#3a2a2a" floodOpacity="0.22" /></filter>
+          <linearGradient id="cv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#f0dcd6" /><stop offset="0.55" stopColor="#d6b3b0" /><stop offset="1" stopColor="#b1888c" /></linearGradient>
+        </defs>
+        <rect width="100" height="100" fill="#f3f1ec" />
+        {art}
+      </svg>
+    </div>
+  );
+}
+
 export function Check() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
