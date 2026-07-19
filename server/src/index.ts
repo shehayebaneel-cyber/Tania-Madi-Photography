@@ -16,8 +16,22 @@ const PROD = process.env.NODE_ENV === "production";
 
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
-const origins = WEB_URL.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (/^https?:\/\//.test(s) ? s : "https://" + s));
-app.use(cors({ origin: origins, credentials: true }));
+// Configured origins from WEB_URL, plus a resilient fallback: any *.onrender.com host and
+// localhost. Render's fromService WEB_URL wiring can arrive empty/wrong, which would otherwise
+// break CORS for the deployed front-end, so we don't depend on it alone.
+const allowlist = WEB_URL.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (/^https?:\/\//.test(s) ? s : "https://" + s));
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // curl, health checks, same-origin
+      let host = "";
+      try { host = new URL(origin).hostname; } catch { /* ignore */ }
+      const ok = allowlist.includes(origin) || /\.onrender\.com$/.test(host) || host === "localhost" || host === "127.0.0.1";
+      cb(null, ok);
+    },
+    credentials: true,
+  })
+);
 
 function ref(prefix: string) {
   return prefix + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
