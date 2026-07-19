@@ -22,7 +22,7 @@ export default function Home() {
   return (
     <>
       <section className="hero">
-        <Tone tone="g-wed" />
+        <Tone tone="g-wed" img="https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=80&auto=format&fit=crop" pos="center 35%" />
         <div className="hero-veil" />
         <div className="hero-inner">
           <p className="eyebrow reveal">Aley, Lebanon</p>
