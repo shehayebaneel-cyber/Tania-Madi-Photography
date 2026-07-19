@@ -46,6 +46,13 @@ sections sharing one customer account + one admin dashboard:
 - `DATABASE_URL`, `DIRECT_URL` (Neon pooled + direct), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `JWT_SECRET` (auto)
 - `⚠️` Neon password was shared in plaintext during setup — rotate it.
 
+## Deployed
+Live on Render (free tier, ~50s cold start): web https://tania-web.onrender.com,
+api https://tania-api.onrender.com. Render `fromService` env wiring arrived empty, so:
+render.yaml sets `VITE_API_URL` explicitly, the API CORS accepts any `*.onrender.com`
+origin, and the web self-heals the API host (tania-web→tania-api). Verify deploys by
+CONTENT (grep the live bundle), not by local build hash — Render rebuilds its own hashes.
+
 ## Status / phased plan
 - [x] Phase 1: all pages built + working — Home, Services + detail, Portfolio (filter + swipe
       lightbox), Book (multi-step), Frames shop + Product (options + upload preview), Editing
@@ -55,4 +62,7 @@ sections sharing one customer account + one admin dashboard:
 - [ ] Real photo/file uploads to storage (R2) — portfolio, product photos, editing files, watermarked previews
 - [ ] Phase 2 next (client's pick): deepen **Frames & prints shop** — full product add/edit form, variants, crop preview, discount codes
 - [ ] Later: packages editor, private client galleries + secure downloads, online card payment, SEO/analytics, policies pages
-- [ ] Confirm before publishing: phone number, exact studio address + map pin, logo files
+- Real contact (from IG "Contact us", 2026-07-19): phone/WhatsApp **+961 71 547 939**,
+  email **tania.w.m@outlook.com**, IG @taniamadi_photography. Set in DB `contact` setting + seed.
+- [ ] Still to confirm before publishing: exact studio address + map pin, logo files. Admin login
+  is still taniamadi.photography@gmail.com (arbitrary) — can realign to the outlook email.
