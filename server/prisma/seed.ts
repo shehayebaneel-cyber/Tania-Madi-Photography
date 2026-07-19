@@ -93,7 +93,7 @@ const TESTIMONIALS = [
 
 const SETTINGS: Record<string, unknown> = {
   contact: {
-    phone: "", whatsapp: "", email: "taniamadi.photography@gmail.com",
+    phone: "+961 71 547 939", whatsapp: "+961 71 547 939", email: "tania.w.m@outlook.com",
     instagram: "taniamadi_photography", instagramUrl: "https://instagram.com/taniamadi_photography",
     address: "3rd floor, Adico Building, Piscine Street, Aley, Lebanon",
     hours: "By appointment · Mon–Sat", mapUrl: "",
