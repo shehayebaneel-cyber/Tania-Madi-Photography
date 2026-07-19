@@ -28,16 +28,29 @@ function hashStr(s: string) {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
   return h;
 }
-export function Tone({ tone, label, className = "", style, onClick, seed, w = 640, h = 800, img, pos }: { tone: string; label?: string; className?: string; style?: React.CSSProperties; onClick?: () => void; seed?: number | string; w?: number; h?: number; img?: string; pos?: string }) {
-  const kw = KEYWORD[tone] || "photography";
+export function Tone({ tone, label, className = "", style, onClick, seed, w = 640, h = 800, img, pos, kw }: { tone: string; label?: string; className?: string; style?: React.CSSProperties; onClick?: () => void; seed?: number | string; w?: number; h?: number; img?: string; pos?: string; kw?: string }) {
+  const keyword = kw || KEYWORD[tone] || "photography";
   const lock = seed != null ? (typeof seed === "number" ? seed : hashStr(seed)) : hashStr(tone + (label || ""));
-  const src = img || `https://loremflickr.com/${w}/${h}/${encodeURIComponent(kw)}?lock=${lock}`;
+  const src = img || `https://loremflickr.com/${w}/${h}/${encodeURIComponent(keyword)}?lock=${lock}`;
   return (
     <div className={`ph ${tone} ${className}`} style={onClick ? { cursor: "zoom-in", ...style } : style} onClick={onClick}>
       <img className="ph-img" src={src} alt={label || ""} loading="lazy" style={pos ? { objectPosition: pos } : undefined} />
       {label && <span className="plabel">{label}</span>}
     </div>
   );
+}
+
+// Product-photo keyword so the shop shows the product (frame/canvas/album), not people.
+export function productKeyword(categorySlug?: string) {
+  switch (categorySlug) {
+    case "frames": return "frame";
+    case "premium-frames": return "frame";
+    case "canvas": return "canvas";
+    case "albums": return "album";
+    case "prints": return "print";
+    case "gifts": return "gift";
+    default: return "frame";
+  }
 }
 
 export function Check() {

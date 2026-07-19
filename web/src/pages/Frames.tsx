@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, type Product, type ProductCategory } from "../lib/api";
-import { Tone } from "../components/Art";
+import { Tone, productKeyword } from "../components/Art";
 
 export default function Frames() {
   const { cat } = useParams();
@@ -27,7 +27,7 @@ export default function Frames() {
             <div className="services" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
               {products.map((p) => (
                 <div key={p.id} className="prod" onClick={() => nav(`/product/${p.id}`)}>
-                  <Tone tone={p.tone} seed={p.id} w={600} h={600} />
+                  <Tone tone={p.tone} kw={productKeyword(p.categorySlug)} seed={p.id} w={600} h={600} />
                   <div className="body">
                     <span className="cat">{p.category?.name}</span>
                     <h3>{p.name}</h3>

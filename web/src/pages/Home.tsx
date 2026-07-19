@@ -88,7 +88,7 @@ export default function Home() {
 
       <section>
         <div className="wrap promos">
-          <div className="promo"><Tone tone="g-family" /><div className="inner"><p className="eyebrow" style={{ color: "var(--gold-soft)" }}>Keepsakes</p><h3>Frames &amp; personalised prints</h3><p>Upload your photo, choose a frame and size — we print, frame and deliver.</p><Link className="btn btn-light" to="/frames">Shop frames &amp; prints</Link></div></div>
+          <div className="promo"><Tone tone="g-family" kw="frame" seed={4021} w={800} h={600} /><div className="inner"><p className="eyebrow" style={{ color: "var(--gold-soft)" }}>Keepsakes</p><h3>Frames &amp; personalised prints</h3><p>Upload your photo, choose a frame and size — we print, frame and deliver.</p><Link className="btn btn-light" to="/frames">Shop frames &amp; prints</Link></div></div>
           <div className="promo"><Tone tone="g-couple" /><div className="inner"><p className="eyebrow" style={{ color: "var(--gold-soft)" }}>Studio service</p><h3>Photo editing &amp; restoration</h3><p>Retouching, background changes, and reviving old family photographs.</p><Link className="btn btn-light" to="/editing">Send a photo to edit</Link></div></div>
         </div>
       </section>
