@@ -41,11 +41,9 @@ services:
     buildCommand: npm install --include=dev && npm run build
     staticPublishPath: dist
     envVars:
+      # Explicit value — Render's fromService wiring arrived empty at build time.
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: tania-api
-          property: host
+        value: https://tania-api.onrender.com
     routes:
       - type: rewrite
         source: /*

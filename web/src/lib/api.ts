@@ -1,5 +1,11 @@
 const RAW = import.meta.env.VITE_API_URL || "";
-const BASE = RAW && !/^https?:\/\//.test(RAW) ? "https://" + RAW : RAW;
+let BASE = RAW && !/^https?:\/\//.test(RAW) ? "https://" + RAW : RAW;
+// Self-heal on Render if the build-time API URL was missing: derive the API host from the
+// web host (tania-web.onrender.com -> tania-api.onrender.com). Avoids depending on Render's
+// fromService env wiring, which can arrive empty.
+if (!BASE && typeof location !== "undefined" && location.hostname.endsWith(".onrender.com")) {
+  BASE = location.origin.replace("tania-web", "tania-api");
+}
 
 export interface Package {
   id: number; name: string; price: number | null; requestPricing: boolean;
