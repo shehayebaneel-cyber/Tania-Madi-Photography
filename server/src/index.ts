@@ -51,6 +51,22 @@ function customerId(req: Request): number | null {
   if (!token) return null;
   try { return (jwt.verify(token, JWT_SECRET) as { id: number }).id; } catch { return null; }
 }
+// booking timeline / audit log
+function logEvent(bookingId: number, e: { type?: string; fromStatus?: string; toStatus?: string; note?: string }) {
+  return prisma.bookingEvent.create({ data: { bookingId, type: e.type || "status", fromStatus: e.fromStatus || "", toStatus: e.toStatus || "", note: e.note || "" } });
+}
+const effDate = (b: { date: string; preferredDate: string }) => b.date || b.preferredDate || "";
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+function dateWindow(filter: string): [string, string] | null {
+  const d = new Date();
+  const sow = new Date(d); sow.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday
+  const eow = new Date(sow); eow.setDate(sow.getDate() + 6);
+  const som = new Date(d.getFullYear(), d.getMonth(), 1), eom = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  if (filter === "today") return [isoDay(d), isoDay(d)];
+  if (filter === "week") return [isoDay(sow), isoDay(eow)];
+  if (filter === "month") return [isoDay(som), isoDay(eom)];
+  return null;
+}
 
 // ---------- health & settings ----------
 app.get("/api/health", async (_req, res) => {
@@ -139,8 +155,9 @@ app.post("/api/bookings", async (req, res) => {
   const b = parsed.data;
   const service = await prisma.service.findUnique({ where: { slug: b.serviceSlug } });
   const booking = await prisma.booking.create({
-    data: { ...b, serviceName: service?.name || b.serviceSlug, reference: ref("BK"), customerId: customerId(req) ?? undefined },
+    data: { ...b, serviceName: service?.name || b.serviceSlug, reference: ref("BK"), source: "website", date: b.preferredDate || "", customerId: customerId(req) ?? undefined },
   });
+  await logEvent(booking.id, { type: "created", toStatus: booking.status, note: "Website booking request" });
   res.json({ ok: true, reference: booking.reference });
 });
 
@@ -241,20 +258,111 @@ app.get("/api/admin/me", requireAdmin, async (req, res) => {
   res.json({ name: u?.name, email: u?.email });
 });
 app.get("/api/admin/stats", requireAdmin, async (_req, res) => {
-  const [bookings, newBookings, orders, editing, revenue] = await Promise.all([
-    prisma.booking.count(), prisma.booking.count({ where: { status: "NEW" } }),
-    prisma.order.count(), prisma.editingRequest.count(),
-    prisma.order.aggregate({ _sum: { total: true } }),
+  const all = await prisma.booking.findMany({ orderBy: { createdAt: "desc" } });
+  const [orders, editing, revenue] = await Promise.all([
+    prisma.order.count(), prisma.editingRequest.count(), prisma.order.aggregate({ _sum: { total: true } }),
   ]);
-  const recentBookings = await prisma.booking.findMany({ take: 6, orderBy: { createdAt: "desc" } });
-  res.json({ bookings, newBookings, orders, editing, revenue: revenue._sum.total || 0, recentBookings });
+  const today = isoDay(new Date());
+  const done = ["COMPLETED", "EDITING", "PREVIEW", "DELIVERED"];
+  const dead = ["CANCELLED", "DECLINED", "NO_SHOW"];
+  res.json({
+    bookings: all.length,
+    newBookings: all.filter((b) => b.status === "NEW").length,
+    todaysBookings: all.filter((b) => effDate(b) === today).length,
+    upcoming: all.filter((b) => effDate(b) >= today && ![...dead, "DELIVERED"].includes(b.status)).length,
+    awaitingDeposits: all.filter((b) => b.status === "AWAITING_DEPOSIT" || (!b.depositPaid && b.status === "CONFIRMED")).length,
+    confirmed: all.filter((b) => b.status === "CONFIRMED").length,
+    completed: all.filter((b) => done.includes(b.status)).length,
+    unpaidBalances: all.filter((b) => (b.price || 0) > (b.depositPaid ? (b.deposit || 0) : 0) && !dead.includes(b.status)).length,
+    orders, editing, revenue: revenue._sum.total || 0,
+    recentBookings: all.slice(0, 6),
+  });
 });
-app.get("/api/admin/bookings", requireAdmin, async (_req, res) => res.json(await prisma.booking.findMany({ orderBy: { createdAt: "desc" } })));
+app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
+  const all = await prisma.booking.findMany({ orderBy: { createdAt: "desc" } });
+  const q = String(req.query.q || "").toLowerCase().trim();
+  const status = String(req.query.status || ""), service = String(req.query.service || "");
+  const filter = String(req.query.filter || ""), payment = String(req.query.payment || "");
+  const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(1000, Math.max(1, Number(req.query.pageSize) || 20));
+  const today = isoDay(new Date());
+  let rows = all;
+  if (q) rows = rows.filter((b) => [b.reference, b.customerName, b.phone, b.email, b.whatsapp, b.instagram, b.serviceName, effDate(b)].join(" ").toLowerCase().includes(q));
+  if (status) rows = rows.filter((b) => b.status === status);
+  if (service) rows = rows.filter((b) => b.serviceSlug === service);
+  if (payment === "unpaid") rows = rows.filter((b) => !b.depositPaid);
+  if (payment === "paid") rows = rows.filter((b) => b.depositPaid);
+  if (filter === "new") rows = rows.filter((b) => b.status === "NEW");
+  else if (filter === "awaiting_deposit") rows = rows.filter((b) => b.status === "AWAITING_DEPOSIT");
+  else if (filter === "confirmed") rows = rows.filter((b) => b.status === "CONFIRMED");
+  else if (filter === "completed") rows = rows.filter((b) => ["COMPLETED", "EDITING", "PREVIEW", "DELIVERED"].includes(b.status));
+  else if (filter === "cancelled") rows = rows.filter((b) => ["CANCELLED", "DECLINED", "NO_SHOW"].includes(b.status));
+  else if (filter === "upcoming") rows = rows.filter((b) => effDate(b) >= today);
+  else if (filter === "past") rows = rows.filter((b) => effDate(b) && effDate(b) < today);
+  else { const w = dateWindow(filter); if (w) rows = rows.filter((b) => { const dt = effDate(b); return dt >= w[0] && dt <= w[1]; }); }
+  res.json({ items: rows.slice((page - 1) * pageSize, page * pageSize), total: rows.length, page, pageSize });
+});
+app.get("/api/admin/bookings/:id", requireAdmin, async (req, res) => {
+  const b = await prisma.booking.findUnique({ where: { id: Number(req.params.id) }, include: { events: { orderBy: { createdAt: "desc" } }, customer: true } });
+  if (!b) return res.status(404).json({ error: "Not found." });
+  res.json(b);
+});
 app.patch("/api/admin/bookings/:id", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const cur = await prisma.booking.findUnique({ where: { id } });
+  if (!cur) return res.status(404).json({ error: "Not found." });
   const data: any = {};
-  for (const k of ["status", "adminNotes"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
-  for (const k of ["quote", "deposit"]) if (req.body?.[k] != null) data[k] = Number(req.body[k]);
-  res.json(await prisma.booking.update({ where: { id: Number(req.params.id) }, data }));
+  for (const k of ["status", "adminNotes", "source", "date", "startTime", "endTime", "paymentMethod", "serviceSlug", "serviceName", "preferredDate", "altDate", "preferredTime", "setting", "locationText", "people", "packagePref", "description", "customerName", "phone", "whatsapp", "email", "instagram", "heardFrom"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  for (const k of ["quote", "deposit", "price", "packageId"]) if (req.body?.[k] !== undefined) data[k] = req.body[k] == null || req.body[k] === "" ? null : Number(req.body[k]);
+  if (typeof req.body?.depositPaid === "boolean") data.depositPaid = req.body.depositPaid;
+  if (typeof req.body?.withVideo === "boolean") data.withVideo = req.body.withVideo;
+  if (Array.isArray(req.body?.extras)) data.extras = req.body.extras;
+  const updated = await prisma.booking.update({ where: { id }, data });
+  if (data.status && data.status !== cur.status) await logEvent(id, { type: "status", fromStatus: cur.status, toStatus: data.status });
+  res.json(updated);
+});
+// manual add booking (find or link existing customer by phone/email)
+app.post("/api/admin/bookings", requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  if (!b.customerName || !b.phone) return res.status(400).json({ error: "Customer name and phone are required." });
+  const service = b.serviceSlug ? await prisma.service.findUnique({ where: { slug: b.serviceSlug } }) : null;
+  let linkId = b.customerId ? Number(b.customerId) : undefined;
+  if (!linkId) {
+    const digits = String(b.phone).replace(/\D/g, "");
+    const existing = digits.length >= 6 ? await prisma.customer.findFirst({ where: { OR: [{ phone: { contains: digits.slice(-6) } }, ...(b.email ? [{ email: String(b.email) }] : [])] } }) : null;
+    if (existing) linkId = existing.id;
+  }
+  const booking = await prisma.booking.create({ data: {
+    reference: ref("BK"), serviceSlug: b.serviceSlug || "", serviceName: service?.name || b.serviceName || b.serviceSlug || "",
+    date: b.date || "", preferredDate: b.date || "", startTime: b.startTime || "", endTime: b.endTime || "",
+    setting: b.setting || "", locationText: b.locationText || "", people: String(b.people || ""), withVideo: !!b.withVideo,
+    packagePref: b.packagePref || "", packageId: b.packageId ? Number(b.packageId) : null, description: b.description || "",
+    customerName: b.customerName, phone: b.phone, whatsapp: b.whatsapp || "", email: b.email || "", instagram: b.instagram || "",
+    heardFrom: b.heardFrom || "", source: b.source || "studio", status: b.status || "CONFIRMED",
+    price: b.price != null && b.price !== "" ? Number(b.price) : null, deposit: b.deposit != null && b.deposit !== "" ? Number(b.deposit) : null,
+    depositPaid: !!b.depositPaid, paymentMethod: b.paymentMethod || "", adminNotes: b.adminNotes || "",
+    customerId: linkId ?? null, extras: Array.isArray(b.extras) ? b.extras : [],
+  } as any });
+  await logEvent(booking.id, { type: "created", toStatus: booking.status, note: "Added manually" });
+  res.json(booking);
+});
+app.post("/api/admin/bookings/:id/note", requireAdmin, async (req, res) => {
+  const note = String(req.body?.note || "").trim();
+  if (!note) return res.status(400).json({ error: "Write a note first." });
+  res.json(await logEvent(Number(req.params.id), { type: "note", note }));
+});
+app.post("/api/admin/bookings/:id/duplicate", requireAdmin, async (req, res) => {
+  const src = await prisma.booking.findUnique({ where: { id: Number(req.params.id) } });
+  if (!src) return res.status(404).json({ error: "Not found." });
+  const { id: _id, reference: _r, createdAt: _c, updatedAt: _u, ...rest } = src;
+  const copy = await prisma.booking.create({ data: { ...rest, reference: ref("BK"), status: "NEW", depositPaid: false } as any });
+  await logEvent(copy.id, { type: "created", toStatus: "NEW", note: "Duplicated from " + src.reference });
+  res.json(copy);
+});
+app.delete("/api/admin/bookings/:id", requireAdmin, async (req, res) => { await prisma.booking.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+// customer quick-search for the manual booking form
+app.get("/api/admin/customers-search", requireAdmin, async (req, res) => {
+  const q = String(req.query.q || "").trim(); if (q.length < 2) return res.json([]);
+  res.json(await prisma.customer.findMany({ where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }] }, take: 8, select: { id: true, name: true, phone: true, email: true, whatsapp: true, instagram: true } }));
 });
 app.get("/api/admin/orders", requireAdmin, async (_req, res) => res.json(await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true } })));
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => res.json(await prisma.order.update({ where: { id: Number(req.params.id) }, data: { status: String(req.body?.status || "NEW") } })));

@@ -4,10 +4,9 @@ import { api } from "../lib/api";
 import { Logo } from "../components/Art";
 import { MediaLibrary } from "../admin/Media";
 import { PortfolioAdmin } from "../admin/Portfolio";
+import { BookingsAdmin, CalendarAdmin } from "../admin/Bookings";
 
-type Tab = "dashboard" | "bookings" | "orders" | "editing" | "portfolio" | "media" | "products";
-
-const BOOKING_STATUSES = ["NEW", "CONTACTED", "QUOTED", "AWAITING_DEPOSIT", "CONFIRMED", "COMPLETED", "CANCELLED", "DECLINED", "RESCHEDULE"];
+type Tab = "dashboard" | "bookings" | "calendar" | "orders" | "editing" | "portfolio" | "media" | "products";
 const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
 const ORDER_STATUSES = ["NEW", "AWAITING_PHOTO_REVIEW", "PHOTO_APPROVED", "AWAITING_PAYMENT", "PRINTING", "FRAMING", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
 
@@ -31,6 +30,7 @@ export default function Admin() {
         <div className="brand"><Logo light /></div>
         {nl("dashboard", "Dashboard", <Ico d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" />)}
         {nl("bookings", "Bookings", <Ico d="M8 2v3M16 2v3M3 8h18M4 5h16v16H4z" />)}
+        {nl("calendar", "Calendar", <Ico d="M8 2v3M16 2v3M4 5h16v16H4zM3 9h18M8 13h2M14 13h2M8 17h2M14 17h2" />)}
         {nl("orders", "Orders", <Ico d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />)}
         {nl("editing", "Editing", <Ico d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />)}
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
@@ -42,7 +42,8 @@ export default function Admin() {
       </aside>
       <main className="amain">
         {tab === "dashboard" && <Dashboard name={name} />}
-        {tab === "bookings" && <Bookings />}
+        {tab === "bookings" && <BookingsAdmin />}
+        {tab === "calendar" && <CalendarAdmin />}
         {tab === "orders" && <Orders />}
         {tab === "editing" && <Editing />}
         {tab === "portfolio" && <PortfolioAdmin />}
@@ -62,7 +63,10 @@ function Dashboard({ name }: { name: string }) {
     <>
       <div className="ahead"><div><h1>Welcome back, {name.split(" ")[0]}</h1><p className="muted">Here's what's happening at the studio.</p></div></div>
       <div className="stats-row">
-        <Stat l="New requests" n={s.newBookings} /><Stat l="Total bookings" n={s.bookings} /><Stat l="Product orders" n={s.orders} /><Stat l="Editing requests" n={s.editing} />
+        <Stat l="New requests" n={s.newBookings} /><Stat l="Today's sessions" n={s.todaysBookings ?? 0} /><Stat l="Upcoming" n={s.upcoming ?? 0} /><Stat l="Awaiting deposit" n={s.awaitingDeposits ?? 0} />
+      </div>
+      <div className="stats-row">
+        <Stat l="Confirmed" n={s.confirmed ?? 0} /><Stat l="Completed" n={s.completed ?? 0} /><Stat l="Unpaid balances" n={s.unpaidBalances ?? 0} /><Stat l="Product orders" n={s.orders} />
       </div>
       <div className="panel">
         <div className="ph2">Latest booking requests</div>
@@ -79,31 +83,6 @@ function Dashboard({ name }: { name: string }) {
   );
 }
 const Stat = ({ l, n }: { l: string; n: number }) => <div className="stat"><div className="l">{l}</div><div className="n">{n}</div></div>;
-
-function Bookings() {
-  const [rows, setRows] = useState<any[]>([]);
-  const load = () => api.adminBookings().then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
-  return (
-    <>
-      <div className="ahead"><h1>Bookings</h1></div>
-      <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Ref</th><th>Service</th><th>Customer</th><th>Details</th><th>Status</th></tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td colSpan={5} className="muted">No bookings yet.</td></tr> : rows.map((b) => (
-            <tr key={b.id}>
-              <td>{b.reference}<div className="muted" style={{ fontSize: 12 }}>{new Date(b.createdAt).toLocaleDateString()}</div></td>
-              <td>{b.serviceName}{b.withVideo ? " + video" : ""}</td>
-              <td>{b.customerName}<div className="muted" style={{ fontSize: 12 }}>{b.phone}{b.email ? ` · ${b.email}` : ""}</div></td>
-              <td className="muted" style={{ fontSize: 13, maxWidth: 260 }}>{[b.preferredDate, b.preferredTime, b.setting, b.locationText, b.description].filter(Boolean).join(" · ")}</td>
-              <td><select value={b.status} onChange={async (e) => { await api.adminUpdateBooking(b.id, { status: e.target.value }); load(); }} style={sel}>{BOOKING_STATUSES.map((x) => <option key={x} value={x}>{x.replace(/_/g, " ")}</option>)}</select></td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div></div>
-    </>
-  );
-}
 
 function Orders() {
   const [rows, setRows] = useState<any[]>([]);

@@ -168,14 +168,38 @@ model Booking {
   email         String   @default("")
   instagram     String   @default("")
   heardFrom     String   @default("")
-  status        String   @default("NEW") // NEW,CONTACTED,QUOTED,AWAITING_DEPOSIT,CONFIRMED,COMPLETED,CANCELLED,DECLINED,RESCHEDULE
-  adminNotes    String   @default("")
+  // 15 statuses: NEW,CONTACTED,QUOTED,AWAITING_APPROVAL,AWAITING_DEPOSIT,CONFIRMED,PREP,
+  // COMPLETED,EDITING,PREVIEW,DELIVERED,RESCHEDULE,CANCELLED,DECLINED,NO_SHOW
+  status        String   @default("NEW")
+  source        String   @default("website") // website|whatsapp|instagram|phone|studio|other
+  date          String   @default("") // confirmed session date YYYY-MM-DD (falls back to preferredDate)
+  startTime     String   @default("")
+  endTime       String   @default("")
+  price         Int? // final agreed total (centavos-free: whole $)
+  depositPaid   Boolean  @default(false)
+  paymentMethod String   @default("") // cash|whish|other
+  extras        Json     @default("[]") // [{name, price}]
+  packageId     Int?
+  adminNotes    String   @default("") // internal staff notes
   quote         Int?
   deposit       Int?
   customerId    Int?
   customer      Customer? @relation(fields: [customerId], references: [id])
+  events        BookingEvent[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// Timeline / audit log for a booking (status changes + notes).
+model BookingEvent {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  type       String   @default("status") // created|status|note|update
+  fromStatus String   @default("")
+  toStatus   String   @default("")
+  note       String   @default("")
+  createdAt  DateTime @default(now())
 }
 
 model ProductCategory {
