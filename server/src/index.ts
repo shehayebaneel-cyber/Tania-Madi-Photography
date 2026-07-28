@@ -80,10 +80,19 @@ app.get("/api/portfolio", async (req, res) => {
   const category = typeof req.query.category === "string" && req.query.category !== "all" ? req.query.category : undefined;
   const featured = req.query.featured === "1";
   const where: any = { isActive: true, hasConsent: true };
-  if (category) where.category = category;
+  // an item shows in a category if it's the primary OR listed in extraCategories
+  if (category) where.OR = [{ category }, { extraCategories: { array_contains: category } }];
   if (featured) where.isFeatured = true;
   const items = await prisma.portfolioItem.findMany({ where, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
   res.json(items);
+});
+
+// public portfolio categories (active only) with cover + live photo count
+app.get("/api/portfolio-categories", async (_req, res) => {
+  const cats = await prisma.portfolioCategory.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } });
+  const items = await prisma.portfolioItem.findMany({ where: { isActive: true, hasConsent: true }, select: { category: true, extraCategories: true } });
+  const count = (slug: string) => items.filter((i) => i.category === slug || (Array.isArray(i.extraCategories) && (i.extraCategories as string[]).includes(slug))).length;
+  res.json(cats.map((c) => ({ slug: c.slug, name: c.name, blurb: c.blurb, coverImageUrl: c.coverImageUrl, count: count(c.slug) })));
 });
 
 // ---------- testimonials ----------
@@ -257,12 +266,68 @@ app.patch("/api/admin/editing/:id", requireAdmin, async (req, res) => {
   res.json(await prisma.editingRequest.update({ where: { id: Number(req.params.id) }, data }));
 });
 
-// portfolio admin
-app.get("/api/admin/portfolio", requireAdmin, async (_req, res) => res.json(await prisma.portfolioItem.findMany({ orderBy: { sortOrder: "asc" } })));
-const portfolioInput = z.object({ category: z.string(), title: z.string().default(""), description: z.string().default(""), tone: z.string().default("g-family"), imageUrl: z.string().default(""), orientation: z.string().default("portrait"), isFeatured: z.boolean().default(false), isActive: z.boolean().default(true), hasConsent: z.boolean().default(true) });
-app.post("/api/admin/portfolio", requireAdmin, async (req, res) => { const d = portfolioInput.safeParse(req.body); if (!d.success) return res.status(400).json({ error: "Invalid data." }); res.json(await prisma.portfolioItem.create({ data: d.data })); });
+// ---------- portfolio categories admin ----------
+app.get("/api/admin/portfolio-categories", requireAdmin, async (_req, res) => {
+  const cats = await prisma.portfolioCategory.findMany({ orderBy: { sortOrder: "asc" } });
+  const items = await prisma.portfolioItem.findMany({ select: { category: true, extraCategories: true } });
+  const count = (slug: string) => items.filter((i) => i.category === slug || (Array.isArray(i.extraCategories) && (i.extraCategories as string[]).includes(slug))).length;
+  res.json(cats.map((c) => ({ ...c, count: count(c.slug) })));
+});
+const pcatInput = z.object({ slug: z.string().min(1), name: z.string().min(1), blurb: z.string().default(""), coverImageUrl: z.string().default(""), isActive: z.boolean().default(true), sortOrder: z.number().int().default(0) });
+app.post("/api/admin/portfolio-categories", requireAdmin, async (req, res) => {
+  const d = pcatInput.safeParse({ ...req.body, slug: String(req.body?.slug || req.body?.name || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") });
+  if (!d.success) return res.status(400).json({ error: "Name is required." });
+  if (await prisma.portfolioCategory.findUnique({ where: { slug: d.data.slug } })) return res.status(409).json({ error: "A category with this name already exists." });
+  const max = await prisma.portfolioCategory.aggregate({ _max: { sortOrder: true } });
+  res.json(await prisma.portfolioCategory.create({ data: { ...d.data, sortOrder: (max._max.sortOrder ?? 0) + 1 } }));
+});
+app.put("/api/admin/portfolio-categories/:slug", requireAdmin, async (req, res) => {
+  const data: any = {};
+  for (const k of ["name", "blurb", "coverImageUrl"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  if (typeof req.body?.isActive === "boolean") data.isActive = req.body.isActive;
+  res.json(await prisma.portfolioCategory.update({ where: { slug: req.params.slug }, data }));
+});
+app.post("/api/admin/portfolio-categories/reorder", requireAdmin, async (req, res) => {
+  const slugs: string[] = Array.isArray(req.body?.slugs) ? req.body.slugs : [];
+  await prisma.$transaction(slugs.map((slug, i) => prisma.portfolioCategory.update({ where: { slug }, data: { sortOrder: i } })));
+  res.json({ ok: true });
+});
+app.delete("/api/admin/portfolio-categories/:slug", requireAdmin, async (req, res) => {
+  await prisma.portfolioCategory.delete({ where: { slug: req.params.slug } });
+  res.json({ ok: true });
+});
+
+// ---------- portfolio items admin ----------
+app.get("/api/admin/portfolio", requireAdmin, async (_req, res) => res.json(await prisma.portfolioItem.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] })));
+const portfolioInput = z.object({
+  category: z.string(), extraCategories: z.array(z.string()).default([]),
+  title: z.string().default(""), description: z.string().default(""), tone: z.string().default("g-family"),
+  imageUrl: z.string().default(""), videoUrl: z.string().default(""), mediaType: z.string().default("photo"),
+  orientation: z.string().default("portrait"), isFeatured: z.boolean().default(false), isActive: z.boolean().default(true), hasConsent: z.boolean().default(true),
+});
+app.post("/api/admin/portfolio", requireAdmin, async (req, res) => {
+  const d = portfolioInput.safeParse(req.body); if (!d.success) return res.status(400).json({ error: "Invalid data." });
+  const max = await prisma.portfolioItem.aggregate({ _max: { sortOrder: true } });
+  res.json(await prisma.portfolioItem.create({ data: { ...d.data, sortOrder: (max._max.sortOrder ?? 0) + 1 } }));
+});
 app.put("/api/admin/portfolio/:id", requireAdmin, async (req, res) => { const d = portfolioInput.partial().safeParse(req.body); if (!d.success) return res.status(400).json({ error: "Invalid data." }); res.json(await prisma.portfolioItem.update({ where: { id: Number(req.params.id) }, data: d.data })); });
 app.delete("/api/admin/portfolio/:id", requireAdmin, async (req, res) => { await prisma.portfolioItem.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+// reorder a set of items (drag/up-down) — save the new order
+app.post("/api/admin/portfolio/reorder", requireAdmin, async (req, res) => {
+  const ids: number[] = Array.isArray(req.body?.ids) ? req.body.ids.map(Number) : [];
+  await prisma.$transaction(ids.map((id, i) => prisma.portfolioItem.update({ where: { id }, data: { sortOrder: i } })));
+  res.json({ ok: true });
+});
+// bulk-add: create one item per uploaded image, all in a category
+app.post("/api/admin/portfolio/bulk", requireAdmin, async (req, res) => {
+  const category = String(req.body?.category || "");
+  const urls: string[] = Array.isArray(req.body?.imageUrls) ? req.body.imageUrls : [];
+  if (!category || !urls.length) return res.status(400).json({ error: "Pick a category and at least one photo." });
+  const max = await prisma.portfolioItem.aggregate({ _max: { sortOrder: true } });
+  let n = (max._max.sortOrder ?? 0) + 1;
+  await prisma.portfolioItem.createMany({ data: urls.map((imageUrl) => ({ category, imageUrl, mediaType: "photo", sortOrder: n++ })) });
+  res.json({ ok: true, added: urls.length });
+});
 
 // products admin
 app.get("/api/admin/products", requireAdmin, async (_req, res) => res.json(await prisma.product.findMany({ orderBy: { sortOrder: "asc" }, include: { category: true } })));

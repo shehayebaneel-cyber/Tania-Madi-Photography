@@ -50,9 +50,11 @@ export interface Service {
   heroTone: string; isActive: boolean; packages: Package[];
 }
 export interface PortfolioItem {
-  id: number; category: string; title: string; description: string;
-  tone: string; imageUrl: string; orientation: string; isFeatured: boolean;
+  id: number; category: string; extraCategories?: string[]; title: string; description: string;
+  tone: string; imageUrl: string; videoUrl?: string; mediaType?: string; orientation: string;
+  isFeatured: boolean; isActive?: boolean;
 }
+export interface PortfolioCategory { slug: string; name: string; blurb: string; coverImageUrl: string; sortOrder: number; isActive: boolean; count: number; }
 export interface Testimonial { id: number; name: string; sessionType: string; text: string; rating: number; tone: string; }
 export interface ProductCategory { slug: string; name: string; count: number; }
 export interface Product {
@@ -102,6 +104,7 @@ export const api = {
   services: () => req<Service[]>("/api/services"),
   service: (slug: string) => req<Service>(`/api/services/${slug}`),
   portfolio: (p?: { category?: string; featured?: boolean }) => req<PortfolioItem[]>("/api/portfolio" + qs({ category: p?.category, featured: p?.featured ? "1" : undefined })),
+  portfolioCategories: () => req<PortfolioCategory[]>("/api/portfolio-categories"),
   testimonials: () => req<Testimonial[]>("/api/testimonials"),
   productCategories: () => req<ProductCategory[]>("/api/product-categories"),
   products: (p?: { category?: string; featured?: boolean }) => req<Product[]>("/api/products" + qs({ category: p?.category, featured: p?.featured ? "1" : undefined })),
@@ -133,6 +136,13 @@ export const api = {
   adminCreatePortfolio: (b: unknown) => req<any>("/api/admin/portfolio", { method: "POST", body: JSON.stringify(b) }),
   adminUpdatePortfolio: (id: number, b: unknown) => req<any>(`/api/admin/portfolio/${id}`, { method: "PUT", body: JSON.stringify(b) }),
   adminDeletePortfolio: (id: number) => req<any>(`/api/admin/portfolio/${id}`, { method: "DELETE" }),
+  adminReorderPortfolio: (ids: number[]) => req<any>("/api/admin/portfolio/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
+  adminBulkPortfolio: (category: string, imageUrls: string[]) => req<{ ok: true; added: number }>("/api/admin/portfolio/bulk", { method: "POST", body: JSON.stringify({ category, imageUrls }) }),
+  adminPortfolioCategories: () => req<PortfolioCategory[]>("/api/admin/portfolio-categories"),
+  adminCreatePortfolioCategory: (b: unknown) => req<PortfolioCategory>("/api/admin/portfolio-categories", { method: "POST", body: JSON.stringify(b) }),
+  adminUpdatePortfolioCategory: (slug: string, b: unknown) => req<PortfolioCategory>(`/api/admin/portfolio-categories/${slug}`, { method: "PUT", body: JSON.stringify(b) }),
+  adminReorderPortfolioCategories: (slugs: string[]) => req<any>("/api/admin/portfolio-categories/reorder", { method: "POST", body: JSON.stringify({ slugs }) }),
+  adminDeletePortfolioCategory: (slug: string) => req<any>(`/api/admin/portfolio-categories/${slug}`, { method: "DELETE" }),
   adminMedia: (p?: { q?: string; category?: string; page?: number; includeArchived?: boolean }) =>
     req<{ items: Media[]; total: number; page: number; pageSize: number; categories: string[] }>("/api/admin/media" + qs({ q: p?.q, category: p?.category, page: p?.page ? String(p.page) : undefined, includeArchived: p?.includeArchived ? "1" : undefined })),
   adminMediaItem: (id: string) => req<Media>(`/api/admin/media/${id}`),

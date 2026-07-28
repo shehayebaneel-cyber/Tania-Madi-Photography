@@ -107,19 +107,33 @@ model Package {
   isActive      Boolean  @default(true)
 }
 
+// Owner-managed portfolio categories (weddings, couples… — fully editable).
+model PortfolioCategory {
+  slug          String   @id
+  name          String
+  blurb         String   @default("")
+  coverImageUrl String   @default("") // /uploads/<id> — category cover
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
 model PortfolioItem {
-  id          Int      @id @default(autoincrement())
-  category    String // slug: weddings, couples, maternity...
-  title       String   @default("")
-  description String   @default("")
-  tone        String   @default("g-family") // placeholder tone class until real image
-  imageUrl    String   @default("")
-  orientation String   @default("portrait")
-  isFeatured  Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  hasConsent  Boolean  @default(true) // client permission to show publicly
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  category        String // PRIMARY category slug
+  extraCategories Json     @default("[]") // additional category slugs (string[]) — an item can appear in several
+  title           String   @default("")
+  description     String   @default("")
+  tone            String   @default("g-family") // placeholder tone class until real image
+  imageUrl        String   @default("")
+  videoUrl        String   @default("") // YouTube / Vimeo / direct link (empty = photo item)
+  mediaType       String   @default("photo") // photo | video
+  orientation     String   @default("portrait")
+  isFeatured      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  hasConsent      Boolean  @default(true) // client permission to show publicly
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
 }
 
 model Testimonial {

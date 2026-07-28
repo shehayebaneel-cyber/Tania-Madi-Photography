@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, thumbUrl } from "../lib/api";
+import { api } from "../lib/api";
 import { Logo } from "../components/Art";
-import { MediaLibrary, ImagePicker } from "../admin/Media";
+import { MediaLibrary } from "../admin/Media";
+import { PortfolioAdmin } from "../admin/Portfolio";
 
 type Tab = "dashboard" | "bookings" | "orders" | "editing" | "portfolio" | "media" | "products";
 
@@ -44,7 +45,7 @@ export default function Admin() {
         {tab === "bookings" && <Bookings />}
         {tab === "orders" && <Orders />}
         {tab === "editing" && <Editing />}
-        {tab === "portfolio" && <Portfolio />}
+        {tab === "portfolio" && <PortfolioAdmin />}
         {tab === "media" && <MediaLibrary />}
         {tab === "products" && <Products />}
       </main>
@@ -155,62 +156,6 @@ function Editing() {
   );
 }
 
-const PCATS = ["weddings", "couples", "maternity", "newborn", "birthdays", "gender-reveals", "families", "products-food", "videography"];
-
-function Portfolio() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any | null>(null);
-  const load = () => api.adminPortfolio().then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
-  const blank = { category: "weddings", tone: "g-wed", title: "", description: "", imageUrl: "", orientation: "portrait", isFeatured: false, isActive: true, hasConsent: true };
-  return (
-    <>
-      <div className="ahead"><h1>Portfolio</h1><button className="btn btn-dark btn-sm" onClick={() => setEditing(blank)}>+ Add item</button></div>
-      <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Photo</th><th>Category</th><th>Title</th><th>Featured</th><th></th></tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={5} className="muted">No portfolio items yet. Add your first above.</td></tr> : rows.map((r) => (
-          <tr key={r.id}>
-            <td><div style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)", background: "var(--beige)" }}>{r.imageUrl ? <img src={thumbUrl(r.imageUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</div></td>
-            <td>{r.category}{!r.isActive && <span className="pill CANCELLED" style={{ marginLeft: 6 }}>Hidden</span>}</td>
-            <td>{r.title || "—"}</td><td>{r.isFeatured ? "★" : ""}</td>
-            <td><div style={{ display: "flex", gap: 6 }}><button className="icon-act" onClick={() => setEditing(r)}>Edit</button><button className="icon-act" onClick={async () => { if (confirm("Delete this portfolio item?")) { await api.adminDeletePortfolio(r.id); load(); } }}>Delete</button></div></td>
-          </tr>
-        ))}</tbody>
-      </table></div></div>
-      {editing && <PortfolioForm item={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
-    </>
-  );
-}
-
-function PortfolioForm({ item, onClose, onSaved }: { item: any; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState<any>({ ...item });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
-  const set = (p: any) => setF((c: any) => ({ ...c, ...p }));
-  async function save() {
-    setSaving(true); setErr("");
-    const body = { category: f.category, title: f.title || "", description: f.description || "", imageUrl: f.imageUrl || "", tone: f.tone || "g-family", orientation: f.orientation || "portrait", isFeatured: !!f.isFeatured, isActive: f.isActive !== false, hasConsent: f.hasConsent !== false };
-    try { if (f.id) await api.adminUpdatePortfolio(f.id, body); else await api.adminCreatePortfolio(body); onSaved(); }
-    catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); } finally { setSaving(false); }
-  }
-  return (
-    <div className="modal-back" onClick={onClose}><div className="modal-card sm" onClick={(e) => e.stopPropagation()}>
-      <div className="ahead"><h1 style={{ fontSize: 20 }}>{f.id ? "Edit" : "Add"} portfolio item</h1><button className="icon-act" onClick={onClose}>Close</button></div>
-      <div style={{ display: "grid", gap: 12 }}>
-        <ImagePicker value={f.imageUrl || ""} onChange={(u) => set({ imageUrl: u })} label="Photo" />
-        <div className="field"><label>Category</label><select value={f.category} onChange={(e) => set({ category: e.target.value })}>{PCATS.map((c) => <option key={c}>{c}</option>)}</select></div>
-        <div className="field"><label>Title (optional)</label><input value={f.title || ""} onChange={(e) => set({ title: e.target.value })} /></div>
-        <div className="field"><label>Description (optional)</label><textarea rows={2} value={f.description || ""} onChange={(e) => set({ description: e.target.value })} /></div>
-        <div style={{ display: "flex", gap: 18 }}>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}><input type="checkbox" style={{ width: "auto" }} checked={!!f.isFeatured} onChange={(e) => set({ isFeatured: e.target.checked })} /> Featured</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}><input type="checkbox" style={{ width: "auto" }} checked={f.isActive !== false} onChange={(e) => set({ isActive: e.target.checked })} /> Visible on site</label>
-        </div>
-        {err && <p style={{ color: "var(--crit)", fontSize: 13 }}>{err}</p>}
-        <button className="btn btn-gold btn-sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save item"}</button>
-      </div>
-    </div></div>
-  );
-}
 
 function Products() {
   const [rows, setRows] = useState<any[]>([]);
