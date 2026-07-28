@@ -24,6 +24,38 @@ model AdminUser {
   createdAt    DateTime @default(now())
 }
 
+// Central media library. Uploaded photos are processed to WebP (full + thumb)
+// and stored here so they survive Render's ephemeral disk. Served at
+// /uploads/<id> (full) and /uploads/<id>/thumb. Storage is isolated in one
+// module (server/src/storage.ts) so it can move to disk/R2 on Hetzner later.
+model Media {
+  id           String   @id // uuid; the /uploads/<id> filename
+  mime         String   @default("image/webp")
+  ext          String   @default("webp")
+  width        Int      @default(0)
+  height       Int      @default(0)
+  bytes        Int      @default(0) // full-size byte length
+  data         Bytes // full-size WebP
+  thumbData    Bytes? // ~480px WebP thumbnail
+  thumbW       Int      @default(0)
+  thumbH       Int      @default(0)
+  hash         String   @default("") // sha256 of the original upload (duplicate detection)
+  originalName String   @default("")
+  title        String   @default("")
+  alt          String   @default("")
+  caption      String   @default("")
+  category     String   @default("") // library folder/category
+  focalX       Float    @default(0.5) // 0..1 focal point for smart cropping
+  focalY       Float    @default(0.5)
+  isArchived   Boolean  @default(false) // hidden from pickers without deleting
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([hash])
+  @@index([category])
+  @@index([createdAt])
+}
+
 model Customer {
   id           Int              @id @default(autoincrement())
   email        String           @unique

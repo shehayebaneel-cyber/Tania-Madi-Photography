@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type Service, type PortfolioItem, type Testimonial } from "../lib/api";
+import { api, mediaUrl, type Service, type PortfolioItem, type Testimonial } from "../lib/api";
 import { useSite } from "../lib/site";
 import { Tone, ProductMock } from "../components/Art";
 
@@ -67,7 +67,7 @@ export default function Home() {
           <div className="sec-head"><div className="divider" /><p className="eyebrow" style={{ marginTop: 16 }}>Selected work</p><h2>A few favourites</h2></div>
           <div className="pgrid">
             {featured.slice(0, 10).map((p, i) => (
-              <Tone key={p.id} tone={p.tone} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} seed={p.id} />
+              <Tone key={p.id} tone={p.tone} img={p.imageUrl ? mediaUrl(p.imageUrl) : undefined} className={`cell ${span(i)}`} label={p.category.replace(/-/g, " ")} seed={p.id} />
             ))}
           </div>
           <div className="center mt40"><Link className="btn btn-outline" to="/portfolio">Explore full portfolio →</Link></div>

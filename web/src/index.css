@@ -360,3 +360,27 @@ footer.site .fnote{font-size:14px;max-width:30ch;margin-top:12px;line-height:1.7
   body{padding-bottom:74px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto}}
+
+/* ---- media library + image picker ---- */
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
+.media-cell{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);cursor:pointer;padding:0;text-align:left;transition:border-color .15s,box-shadow .15s}
+.media-cell:hover{border-color:var(--gold);box-shadow:var(--shadow)}
+.media-cell.sel{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.media-cell .thumb{aspect-ratio:1;width:100%;object-fit:cover;display:block;background:var(--beige)}
+.media-cell .cap{padding:7px 9px}
+.media-cell .cap b{font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.media-cell .cap span{font-size:10.5px;color:var(--grey)}
+.media-badge{position:absolute;top:6px;right:6px;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(30,20,22,.62);color:#fff;letter-spacing:.02em}
+.media-badge.used{background:var(--good)}
+.media-badge.hid{left:6px;right:auto;background:var(--crit)}
+.dropzone{border:2px dashed var(--line);border-radius:14px;padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone.drag{border-color:var(--gold);background:rgba(190,138,134,.07)}
+.uprog{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:10px}
+.uprog>i{display:block;height:100%;background:var(--gold);transition:width .2s ease}
+.modal-back{position:fixed;inset:0;background:rgba(25,17,19,.52);display:grid;place-items:center;padding:14px;z-index:60}
+.modal-card{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:940px;width:100%;max-height:92vh;overflow:auto;padding:18px;box-shadow:var(--shadow-lift)}
+.modal-card.sm{max-width:560px}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);cursor:pointer}
+.chip.on{background:var(--gold);border-color:var(--gold);color:#fff}
+.focalpt{position:absolute;width:18px;height:18px;border-radius:999px;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}

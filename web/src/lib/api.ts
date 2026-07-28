@@ -7,6 +7,37 @@ if (!BASE && typeof location !== "undefined" && location.hostname.endsWith(".onr
   BASE = location.origin.replace("tania-web", "tania-api");
 }
 
+// Resolve a stored image path ("/uploads/<id>") to an absolute URL on the API host.
+export const mediaUrl = (u: string | null | undefined): string => (u && u.startsWith("/uploads/") ? BASE + u : u || "");
+export const thumbUrl = (u: string | null | undefined): string => (u && u.startsWith("/uploads/") ? BASE + u + "/thumb" : u || "");
+
+export interface Media {
+  id: string; mime: string; ext: string; width: number; height: number; bytes: number;
+  thumbW: number; thumbH: number; originalName: string; title: string; alt: string;
+  caption: string; category: string; focalX: number; focalY: number; isArchived: boolean;
+  createdAt: string; updatedAt: string; used?: boolean; usedIn?: string[];
+}
+
+// Upload one or more images with progress (fetch can't report upload progress; XHR can).
+export function uploadMedia(files: File[], opts?: { category?: string; onProgress?: (pct: number) => void }): Promise<{ created: Media[]; duplicates: Media[] }> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    if (opts?.category) fd.append("category", opts.category);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", BASE + "/api/admin/media");
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && opts?.onProgress) opts.onProgress(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onload = () => {
+      let d: any = {}; try { d = JSON.parse(xhr.responseText); } catch { /* ignore */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(d);
+      else reject(new Error(d?.error || "Upload failed. Please try again."));
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.send(fd);
+  });
+}
+
 export interface Package {
   id: number; name: string; price: number | null; requestPricing: boolean;
   durationText: string; editedPhotos: string; outfits: string; features: string[];
@@ -102,6 +133,11 @@ export const api = {
   adminCreatePortfolio: (b: unknown) => req<any>("/api/admin/portfolio", { method: "POST", body: JSON.stringify(b) }),
   adminUpdatePortfolio: (id: number, b: unknown) => req<any>(`/api/admin/portfolio/${id}`, { method: "PUT", body: JSON.stringify(b) }),
   adminDeletePortfolio: (id: number) => req<any>(`/api/admin/portfolio/${id}`, { method: "DELETE" }),
+  adminMedia: (p?: { q?: string; category?: string; page?: number; includeArchived?: boolean }) =>
+    req<{ items: Media[]; total: number; page: number; pageSize: number; categories: string[] }>("/api/admin/media" + qs({ q: p?.q, category: p?.category, page: p?.page ? String(p.page) : undefined, includeArchived: p?.includeArchived ? "1" : undefined })),
+  adminMediaItem: (id: string) => req<Media>(`/api/admin/media/${id}`),
+  adminUpdateMedia: (id: string, b: unknown) => req<Media>(`/api/admin/media/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  adminDeleteMedia: (id: string, force?: boolean) => req<{ ok?: true; error?: string; usedIn?: string[] }>(`/api/admin/media/${id}` + (force ? "?force=1" : ""), { method: "DELETE" }),
   adminProducts: () => req<Product[]>("/api/admin/products"),
   adminCreateProduct: (b: unknown) => req<any>("/api/admin/products", { method: "POST", body: JSON.stringify(b) }),
   adminUpdateProduct: (id: number, b: unknown) => req<any>(`/api/admin/products/${id}`, { method: "PUT", body: JSON.stringify(b) }),

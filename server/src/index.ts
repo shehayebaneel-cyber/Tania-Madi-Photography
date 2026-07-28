@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
+import { mountMedia } from "./media.js";
 import "dotenv/config";
 
 const prisma = new PrismaClient();
@@ -286,5 +287,8 @@ app.put("/api/admin/settings/:key", requireAdmin, async (req, res) => {
   const value = req.body?.value;
   res.json(await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } }));
 });
+
+// media library (upload / serve / search / edit / delete)
+mountMedia(app, prisma, requireAdmin);
 
 app.listen(PORT, () => console.log(`Tania Madi API on http://localhost:${PORT}`));

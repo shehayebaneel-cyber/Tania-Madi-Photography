@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, thumbUrl } from "../lib/api";
 import { Logo } from "../components/Art";
+import { MediaLibrary, ImagePicker } from "../admin/Media";
 
-type Tab = "dashboard" | "bookings" | "orders" | "editing" | "portfolio" | "products";
+type Tab = "dashboard" | "bookings" | "orders" | "editing" | "portfolio" | "media" | "products";
 
 const BOOKING_STATUSES = ["NEW", "CONTACTED", "QUOTED", "AWAITING_DEPOSIT", "CONFIRMED", "COMPLETED", "CANCELLED", "DECLINED", "RESCHEDULE"];
 const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
@@ -32,6 +33,7 @@ export default function Admin() {
         {nl("orders", "Orders", <Ico d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />)}
         {nl("editing", "Editing", <Ico d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />)}
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
+        {nl("media", "Media Library", <Ico d="M4 4h16v16H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />)}
         {nl("products", "Products", <Ico d="M3 7h18M3 12h18M3 17h18" />)}
         <div className="spacer" />
         <button className="navlink" onClick={() => nav("/")}><Ico d="M3 12l9-9 9 9M5 10v10h14V10" />View site</button>
@@ -43,6 +45,7 @@ export default function Admin() {
         {tab === "orders" && <Orders />}
         {tab === "editing" && <Editing />}
         {tab === "portfolio" && <Portfolio />}
+        {tab === "media" && <MediaLibrary />}
         {tab === "products" && <Products />}
       </main>
     </div>
@@ -152,38 +155,60 @@ function Editing() {
   );
 }
 
-const TONES = ["g-wed", "g-couple", "g-mat", "g-newborn", "g-birthday", "g-gender", "g-family", "g-food", "g-video"];
 const PCATS = ["weddings", "couples", "maternity", "newborn", "birthdays", "gender-reveals", "families", "products-food", "videography"];
 
 function Portfolio() {
   const [rows, setRows] = useState<any[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ category: "weddings", tone: "g-wed", title: "", isFeatured: false });
+  const [editing, setEditing] = useState<any | null>(null);
   const load = () => api.adminPortfolio().then(setRows).catch(() => {});
   useEffect(() => { load(); }, []);
-  async function create() { await api.adminCreatePortfolio({ ...form, description: "", imageUrl: "", orientation: "portrait", isActive: true, hasConsent: true }); setAdding(false); load(); }
+  const blank = { category: "weddings", tone: "g-wed", title: "", description: "", imageUrl: "", orientation: "portrait", isFeatured: false, isActive: true, hasConsent: true };
   return (
     <>
-      <div className="ahead"><h1>Portfolio</h1><button className="btn btn-dark btn-sm" onClick={() => setAdding((v) => !v)}>+ Add item</button></div>
-      {adding && (
-        <div className="panel" style={{ padding: 18 }}>
-          <div className="form-grid">
-            <div className="field"><label>Category</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{PCATS.map((c) => <option key={c}>{c}</option>)}</select></div>
-            <div className="field"><label>Tone (placeholder)</label><select value={form.tone} onChange={(e) => setForm({ ...form, tone: e.target.value })}>{TONES.map((c) => <option key={c}>{c}</option>)}</select></div>
-            <div className="field"><label>Title (optional)</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div className="field"><label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" style={{ width: "auto" }} checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} /> Featured</label></div>
-          </div>
-          <button className="btn btn-gold btn-sm" onClick={create}>Save</button>
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Real photo uploads to storage come in the next phase — for now items use tone placeholders.</p>
-        </div>
-      )}
+      <div className="ahead"><h1>Portfolio</h1><button className="btn btn-dark btn-sm" onClick={() => setEditing(blank)}>+ Add item</button></div>
       <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Category</th><th>Title</th><th>Featured</th><th></th></tr></thead>
-        <tbody>{rows.map((r) => (
-          <tr key={r.id}><td>{r.category}</td><td>{r.title || "—"}</td><td>{r.isFeatured ? "★" : ""}</td><td><button className="icon-act" onClick={async () => { await api.adminDeletePortfolio(r.id); load(); }}>Delete</button></td></tr>
+        <thead><tr><th>Photo</th><th>Category</th><th>Title</th><th>Featured</th><th></th></tr></thead>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={5} className="muted">No portfolio items yet. Add your first above.</td></tr> : rows.map((r) => (
+          <tr key={r.id}>
+            <td><div style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)", background: "var(--beige)" }}>{r.imageUrl ? <img src={thumbUrl(r.imageUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</div></td>
+            <td>{r.category}{!r.isActive && <span className="pill CANCELLED" style={{ marginLeft: 6 }}>Hidden</span>}</td>
+            <td>{r.title || "—"}</td><td>{r.isFeatured ? "★" : ""}</td>
+            <td><div style={{ display: "flex", gap: 6 }}><button className="icon-act" onClick={() => setEditing(r)}>Edit</button><button className="icon-act" onClick={async () => { if (confirm("Delete this portfolio item?")) { await api.adminDeletePortfolio(r.id); load(); } }}>Delete</button></div></td>
+          </tr>
         ))}</tbody>
       </table></div></div>
+      {editing && <PortfolioForm item={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
+  );
+}
+
+function PortfolioForm({ item, onClose, onSaved }: { item: any; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<any>({ ...item });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (p: any) => setF((c: any) => ({ ...c, ...p }));
+  async function save() {
+    setSaving(true); setErr("");
+    const body = { category: f.category, title: f.title || "", description: f.description || "", imageUrl: f.imageUrl || "", tone: f.tone || "g-family", orientation: f.orientation || "portrait", isFeatured: !!f.isFeatured, isActive: f.isActive !== false, hasConsent: f.hasConsent !== false };
+    try { if (f.id) await api.adminUpdatePortfolio(f.id, body); else await api.adminCreatePortfolio(body); onSaved(); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); } finally { setSaving(false); }
+  }
+  return (
+    <div className="modal-back" onClick={onClose}><div className="modal-card sm" onClick={(e) => e.stopPropagation()}>
+      <div className="ahead"><h1 style={{ fontSize: 20 }}>{f.id ? "Edit" : "Add"} portfolio item</h1><button className="icon-act" onClick={onClose}>Close</button></div>
+      <div style={{ display: "grid", gap: 12 }}>
+        <ImagePicker value={f.imageUrl || ""} onChange={(u) => set({ imageUrl: u })} label="Photo" />
+        <div className="field"><label>Category</label><select value={f.category} onChange={(e) => set({ category: e.target.value })}>{PCATS.map((c) => <option key={c}>{c}</option>)}</select></div>
+        <div className="field"><label>Title (optional)</label><input value={f.title || ""} onChange={(e) => set({ title: e.target.value })} /></div>
+        <div className="field"><label>Description (optional)</label><textarea rows={2} value={f.description || ""} onChange={(e) => set({ description: e.target.value })} /></div>
+        <div style={{ display: "flex", gap: 18 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}><input type="checkbox" style={{ width: "auto" }} checked={!!f.isFeatured} onChange={(e) => set({ isFeatured: e.target.checked })} /> Featured</label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}><input type="checkbox" style={{ width: "auto" }} checked={f.isActive !== false} onChange={(e) => set({ isActive: e.target.checked })} /> Visible on site</label>
+        </div>
+        {err && <p style={{ color: "var(--crit)", fontSize: 13 }}>{err}</p>}
+        <button className="btn btn-gold btn-sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save item"}</button>
+      </div>
+    </div></div>
   );
 }
 
