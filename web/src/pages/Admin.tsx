@@ -12,8 +12,9 @@ import { ServicesAdmin } from "../admin/Services";
 import { NotificationsAdmin, NotificationBell } from "../admin/Notifications";
 import { ProductsAdmin, OrdersAdmin, EditingAdmin } from "../admin/Shop";
 import { SettingsAdmin } from "../admin/Settings";
+import { GalleriesAdmin } from "../admin/Galleries";
 
-type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "notifications" | "settings";
+type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "galleries" | "notifications" | "settings";
 
 export default function Admin() {
   const nav = useNavigate();
@@ -53,6 +54,7 @@ export default function Admin() {
         {nl("services", "Services", <Ico d="M12 2l2.6 6.6L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.4-.4z" />)}
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
         {nl("media", "Media Library", <Ico d="M4 4h16v16H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />)}
+        {nl("galleries", "Client Galleries", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4M14 13l3-3 4 4M16 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />)}
         {nl("products", "Products", <Ico d="M3 7h18M3 12h18M3 17h18" />)}
         {nl("settings", "Settings", <Ico d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />)}
         <div className="spacer" />
@@ -73,6 +75,7 @@ export default function Admin() {
         {tab === "portfolio" && <PortfolioAdmin />}
         {tab === "media" && <MediaLibrary />}
         {tab === "products" && <ProductsAdmin />}
+        {tab === "galleries" && <GalleriesAdmin />}
         {tab === "settings" && <SettingsAdmin role={role} />}
       </main>
     </div>

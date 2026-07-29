@@ -95,6 +95,12 @@ export function mountMedia(app: Express, prisma: PrismaClient, requireAdmin: (re
   });
   app.get("/uploads/:id", async (req, res) => {
     const m = await prisma.media.findUnique({ where: { id: req.params.id }, select: { data: true } });
+    // ?dl=<filename> forces a download (Content-Disposition works cross-origin, unlike <a download>).
+    if (m && req.query.dl !== undefined) {
+      const raw = typeof req.query.dl === "string" ? req.query.dl : "";
+      const name = /^[\w.-]{1,80}$/.test(raw) ? raw : `photo-${req.params.id.slice(0, 8)}.webp`;
+      res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+    }
     sendMedia(m ? Buffer.from(m.data) : null, res);
   });
 

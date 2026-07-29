@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
+import { randomBytes } from "crypto";
 import { mountMedia } from "./media.js";
 import "dotenv/config";
 
@@ -841,6 +842,70 @@ app.get("/api/admin/backup", requireAdmin, requireOwner, async (_req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="tania-backup-${isoDay(new Date())}.json"`);
   res.setHeader("Content-Type", "application/json");
   res.send(JSON.stringify(backup, null, 2));
+});
+
+// ---------- client galleries ----------
+// Private per-client photo delivery. Accessed publicly by an unguessable token
+// (+ optional PIN). Photos reuse the Media pipeline (served from /uploads/<id>).
+const galleryToken = () => randomBytes(12).toString("hex"); // 24 hex chars, unguessable
+app.get("/api/admin/galleries", requireAdmin, async (_req, res) => {
+  res.json(await prisma.gallery.findMany({ orderBy: { createdAt: "desc" }, include: { _count: { select: { photos: true } } } }));
+});
+app.post("/api/admin/galleries", requireAdmin, async (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  if (!title) return res.status(400).json({ error: "Give the gallery a title." });
+  const g = await prisma.gallery.create({ data: {
+    token: galleryToken(), title,
+    customerName: String(req.body?.customerName || ""),
+    customerId: req.body?.customerId ? Number(req.body.customerId) : null,
+    bookingId: req.body?.bookingId ? Number(req.body.bookingId) : null,
+    pin: String(req.body?.pin || "").trim(), message: String(req.body?.message || ""),
+    expiresAt: req.body?.expiresAt ? new Date(req.body.expiresAt) : null,
+  } });
+  res.json(g);
+});
+app.get("/api/admin/galleries/:id", requireAdmin, async (req, res) => {
+  const g = await prisma.gallery.findUnique({ where: { id: Number(req.params.id) }, include: { photos: { orderBy: { sortOrder: "asc" } } } });
+  if (!g) return res.status(404).json({ error: "Not found." });
+  res.json(g);
+});
+app.patch("/api/admin/galleries/:id", requireAdmin, async (req, res) => {
+  const b = req.body || {}; const data: any = {};
+  for (const k of ["title", "customerName", "pin", "message", "coverImageUrl"]) if (typeof b[k] === "string") data[k] = b[k];
+  if (typeof b.isPublished === "boolean") data.isPublished = b.isPublished;
+  if (b.expiresAt !== undefined) data.expiresAt = b.expiresAt ? new Date(b.expiresAt) : null;
+  res.json(await prisma.gallery.update({ where: { id: Number(req.params.id) }, data }));
+});
+app.delete("/api/admin/galleries/:id", requireAdmin, async (req, res) => { await prisma.gallery.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+app.post("/api/admin/galleries/:id/photos", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const urls: string[] = Array.isArray(req.body?.urls) ? req.body.urls.filter((u: any) => typeof u === "string" && u) : [];
+  if (!urls.length) return res.status(400).json({ error: "No photos to add." });
+  const max = await prisma.galleryPhoto.aggregate({ where: { galleryId: id }, _max: { sortOrder: true } });
+  let n = (max._max.sortOrder ?? -1) + 1;
+  await prisma.galleryPhoto.createMany({ data: urls.map((imageUrl) => ({ galleryId: id, imageUrl, sortOrder: n++ })) });
+  const g = await prisma.gallery.findUnique({ where: { id }, select: { coverImageUrl: true } });
+  if (g && !g.coverImageUrl) await prisma.gallery.update({ where: { id }, data: { coverImageUrl: urls[0] } });
+  res.json({ ok: true, added: urls.length });
+});
+app.delete("/api/admin/gallery-photos/:id", requireAdmin, async (req, res) => { await prisma.galleryPhoto.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+
+// public gallery access — GET probes whether a PIN is needed; POST returns photos (PIN in body, not URL).
+function galleryGateError(g: { isPublished: boolean; expiresAt: Date | null } | null, res: Response): boolean {
+  if (!g || !g.isPublished) { res.status(404).json({ error: "This gallery isn't available." }); return true; }
+  if (g.expiresAt && g.expiresAt < new Date()) { res.status(410).json({ error: "This gallery link has expired." }); return true; }
+  return false;
+}
+app.get("/api/gallery/:token", async (req, res) => {
+  const g = await prisma.gallery.findUnique({ where: { token: req.params.token }, select: { title: true, isPublished: true, pin: true, expiresAt: true } });
+  if (galleryGateError(g, res)) return;
+  res.json({ title: g!.title, needsPin: !!g!.pin });
+});
+app.post("/api/gallery/:token", async (req, res) => {
+  const g = await prisma.gallery.findUnique({ where: { token: req.params.token }, include: { photos: { orderBy: { sortOrder: "asc" }, select: { id: true, imageUrl: true } } } });
+  if (galleryGateError(g, res)) return;
+  if (g!.pin && String(req.body?.pin || "").trim() !== g!.pin) return res.status(401).json({ error: "Incorrect access code.", needsPin: true });
+  res.json({ title: g!.title, message: g!.message, coverImageUrl: g!.coverImageUrl, photos: g!.photos, count: g!.photos.length });
 });
 
 // media library (upload / serve / search / edit / delete)

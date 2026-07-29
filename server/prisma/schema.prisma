@@ -354,3 +354,32 @@ model EditingRequest {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// Private client gallery — delivered photos shared via an unguessable link (optional PIN).
+model Gallery {
+  id            Int            @id @default(autoincrement())
+  token         String         @unique // the unguessable link slug
+  title         String
+  customerName  String         @default("")
+  customerId    Int? // soft link (no relation, to avoid churn)
+  bookingId     Int?
+  pin           String         @default("") // optional access code; blank = no PIN
+  coverImageUrl String         @default("")
+  message       String         @default("") // short note shown to the client
+  isPublished   Boolean        @default(false)
+  expiresAt     DateTime?
+  photos        GalleryPhoto[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model GalleryPhoto {
+  id        Int      @id @default(autoincrement())
+  galleryId Int
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([galleryId])
+}

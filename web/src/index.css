@@ -165,6 +165,14 @@ section{padding:72px 0}
 .lb .nav{top:50%;transform:translateY(-50%);width:46px;height:46px}
 .lb .nav.prev{left:14px}.lb .nav.next{right:14px}
 .lb .count{position:absolute;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.85);font-size:13px;letter-spacing:.1em}
+.lb .lb-img{max-width:min(94vw,1100px);max-height:86vh;object-fit:contain;border-radius:6px}
+.lb .dl{position:absolute;top:16px;left:16px;width:44px;height:44px;background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:999px;display:grid;place-items:center;cursor:pointer;font-size:20px;text-decoration:none}
+.lb .dl:hover{background:var(--gold)}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.gallery-grid>button{padding:0;border:0;background:var(--beige);border-radius:8px;overflow:hidden;cursor:pointer;aspect-ratio:1}
+.gallery-grid img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.gallery-grid>button:hover img{transform:scale(1.04)}
+@media (max-width:560px){.gallery-grid{grid-template-columns:repeat(2,1fr);gap:7px}}
 
 /* steps */
 .steps-wrap{background:var(--ink)}
@@ -316,6 +324,13 @@ th{text-align:start;font-size:11.5px;text-transform:uppercase;letter-spacing:.06
 td{padding:12px 16px;border-top:1px solid var(--line-2);vertical-align:top}
 .icon-act{background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--ink)}
 .icon-act:hover{border-color:var(--gold);color:var(--gold)}
+.linklike{background:none;border:0;color:var(--gold);font-weight:700;cursor:pointer;padding:0;font-size:inherit;text-align:start}
+.linklike:hover{text-decoration:underline}
+.gal-admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.gal-admin-cell{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.gal-admin-cell img{width:100%;height:100%;object-fit:cover}
+.gal-admin-del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:999px;border:0;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center}
+.gal-admin-del:hover{background:var(--crit)}
 
 /* footer */
 footer.site{background:var(--ink);color:rgba(243,231,226,.72);padding:54px 0 28px}

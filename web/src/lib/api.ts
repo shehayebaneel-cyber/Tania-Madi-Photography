@@ -135,6 +135,17 @@ export const api = {
   adminDeleteTeam: (id: number) => req<any>(`/api/admin/team/${id}`, { method: "DELETE" }),
   adminBackup: () => req<any>("/api/admin/backup"),
   adminChangePassword: (current: string, next: string) => req<any>("/api/admin/password", { method: "POST", body: JSON.stringify({ current, next }) }),
+  // client galleries (admin)
+  adminGalleries: () => req<any[]>("/api/admin/galleries"),
+  adminGallery: (id: number) => req<any>(`/api/admin/galleries/${id}`),
+  adminCreateGallery: (b: { title: string; customerName?: string; customerId?: number; bookingId?: number; pin?: string; message?: string; expiresAt?: string | null }) => req<any>("/api/admin/galleries", { method: "POST", body: JSON.stringify(b) }),
+  adminUpdateGallery: (id: number, b: any) => req<any>(`/api/admin/galleries/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  adminDeleteGallery: (id: number) => req<any>(`/api/admin/galleries/${id}`, { method: "DELETE" }),
+  adminAddGalleryPhotos: (id: number, urls: string[]) => req<any>(`/api/admin/galleries/${id}/photos`, { method: "POST", body: JSON.stringify({ urls }) }),
+  adminDeleteGalleryPhoto: (id: number) => req<any>(`/api/admin/gallery-photos/${id}`, { method: "DELETE" }),
+  // client galleries (public, by token)
+  galleryInfo: (token: string) => req<{ title: string; needsPin: boolean }>(`/api/gallery/${token}`),
+  galleryOpen: (token: string, pin: string) => req<{ title: string; message: string; coverImageUrl: string; photos: { id: number; imageUrl: string }[]; count: number }>(`/api/gallery/${token}`, { method: "POST", body: JSON.stringify({ pin }) }),
   adminBookings: (p?: { q?: string; status?: string; service?: string; filter?: string; payment?: string; page?: number; pageSize?: number }) =>
     req<{ items: any[]; total: number; page: number; pageSize: number }>("/api/admin/bookings" + qs({ q: p?.q, status: p?.status, service: p?.service, filter: p?.filter, payment: p?.payment, page: p?.page ? String(p.page) : undefined, pageSize: p?.pageSize ? String(p.pageSize) : undefined })),
   adminBooking: (id: number) => req<any>(`/api/admin/bookings/${id}`),
