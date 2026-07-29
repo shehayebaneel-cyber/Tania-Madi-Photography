@@ -6,7 +6,7 @@ import { Tone, ProductMock } from "../components/Art";
 
 export default function Home() {
   const nav = useNavigate();
-  const { home, waLink, telLink, contact } = useSite();
+  const { home, promo, waLink, telLink, contact } = useSite();
   const [services, setServices] = useState<Service[]>([]);
   const [featured, setFeatured] = useState<PortfolioItem[]>([]);
   const [tms, setTms] = useState<Testimonial[]>([]);
@@ -34,6 +34,15 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {promo?.active && (promo.title || promo.text) && (
+        <div style={{ background: "var(--gold)", color: "#fff", textAlign: "center", padding: "12px 18px" }}>
+          <div className="wrap" style={{ display: "flex", gap: 14, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+            <span>{promo.title && <strong style={{ marginRight: 8 }}>{promo.title}</strong>}{promo.text}</span>
+            {promo.ctaLabel && promo.ctaHref && <Link to={promo.ctaHref} className="btn btn-light" style={{ padding: "6px 16px" }}>{promo.ctaLabel}</Link>}
+          </div>
+        </div>
+      )}
 
       <section>
         <div className="wrap">

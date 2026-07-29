@@ -101,6 +101,7 @@ const qs = (o: Record<string, string | undefined>) => {
 
 export const api = {
   settings: () => req<Settings>("/api/settings"),
+  settingsPreview: () => req<Settings>("/api/settings/preview"),
   services: () => req<Service[]>("/api/services"),
   service: (slug: string) => req<Service>(`/api/services/${slug}`),
   portfolio: (p?: { category?: string; featured?: boolean }) => req<PortfolioItem[]>("/api/portfolio" + qs({ category: p?.category, featured: p?.featured ? "1" : undefined })),
@@ -148,6 +149,20 @@ export const api = {
   adminUpdateCustomer: (id: number, b: unknown) => req<any>(`/api/admin/customers/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   adminCreateCustomer: (b: unknown) => req<any>("/api/admin/customers", { method: "POST", body: JSON.stringify(b) }),
   adminRebuildCustomers: () => req<{ ok: true; linked: number }>("/api/admin/customers/rebuild", { method: "POST" }),
+  // website content (draft → publish)
+  adminContent: () => req<{ published: Record<string, any>; drafts: Record<string, any> }>("/api/admin/content"),
+  adminSaveDraft: (key: string, value: unknown) => req<any>(`/api/admin/content/${key}`, { method: "PUT", body: JSON.stringify({ value }) }),
+  adminPublishContent: (key: string) => req<any>(`/api/admin/content/${key}/publish`, { method: "POST" }),
+  adminDiscardContent: (key: string) => req<any>(`/api/admin/content/${key}/discard`, { method: "POST" }),
+  // packages
+  adminCreatePackage: (b: unknown) => req<any>("/api/admin/packages", { method: "POST", body: JSON.stringify(b) }),
+  adminUpdatePackage: (id: number, b: unknown) => req<any>(`/api/admin/packages/${id}`, { method: "PUT", body: JSON.stringify(b) }),
+  adminDeletePackage: (id: number) => req<any>(`/api/admin/packages/${id}`, { method: "DELETE" }),
+  // testimonials
+  adminTestimonials: () => req<any[]>("/api/admin/testimonials"),
+  adminCreateTestimonial: (b: unknown) => req<any>("/api/admin/testimonials", { method: "POST", body: JSON.stringify(b) }),
+  adminUpdateTestimonial: (id: number, b: unknown) => req<any>(`/api/admin/testimonials/${id}`, { method: "PUT", body: JSON.stringify(b) }),
+  adminDeleteTestimonial: (id: number) => req<any>(`/api/admin/testimonials/${id}`, { method: "DELETE" }),
   adminOrders: () => req<any[]>("/api/admin/orders"),
   adminUpdateOrder: (id: number, status: string) => req<any>(`/api/admin/orders/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminEditing: () => req<any[]>("/api/admin/editing"),

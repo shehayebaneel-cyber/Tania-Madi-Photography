@@ -7,8 +7,10 @@ import { PortfolioAdmin } from "../admin/Portfolio";
 import { BookingsAdmin, CalendarAdmin } from "../admin/Bookings";
 import { AvailabilityAdmin } from "../admin/Availability";
 import { CustomersAdmin } from "../admin/Customers";
+import { WebsiteContent } from "../admin/Content";
+import { ServicesAdmin } from "../admin/Services";
 
-type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "orders" | "editing" | "portfolio" | "media" | "products";
+type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products";
 const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
 const ORDER_STATUSES = ["NEW", "AWAITING_PHOTO_REVIEW", "PHOTO_APPROVED", "AWAITING_PAYMENT", "PRINTING", "FRAMING", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
 
@@ -37,6 +39,8 @@ export default function Admin() {
         {nl("customers", "Customers", <Ico d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />)}
         {nl("orders", "Orders", <Ico d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />)}
         {nl("editing", "Editing", <Ico d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />)}
+        {nl("content", "Website Content", <Ico d="M4 6h16M4 12h16M4 18h10M3 3h18v18H3z" />)}
+        {nl("services", "Services", <Ico d="M12 2l2.6 6.6L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.4-.4z" />)}
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
         {nl("media", "Media Library", <Ico d="M4 4h16v16H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />)}
         {nl("products", "Products", <Ico d="M3 7h18M3 12h18M3 17h18" />)}
@@ -50,6 +54,8 @@ export default function Admin() {
         {tab === "calendar" && <CalendarAdmin />}
         {tab === "availability" && <AvailabilityAdmin />}
         {tab === "customers" && <CustomersAdmin />}
+        {tab === "content" && <WebsiteContent />}
+        {tab === "services" && <ServicesAdmin />}
         {tab === "orders" && <Orders />}
         {tab === "editing" && <Editing />}
         {tab === "portfolio" && <PortfolioAdmin />}

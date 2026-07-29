@@ -100,10 +100,11 @@ function Footer() {
 export default function Layout({ children }: { children: ReactNode }) {
   const loc = useLocation();
   const nav = useNavigate();
-  const { waLink } = useSite();
+  const { waLink, preview } = useSite();
   if (loc.pathname.startsWith("/admin")) return <>{children}</>;
   return (
     <>
+      {preview && <div style={{ background: "#463639", color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 700, padding: "6px 12px", letterSpacing: ".02em" }}>👁 Preview mode — showing unpublished drafts. Publish in the admin to make changes live.</div>}
       <Header />
       <main>{children}</main>
       <Footer />

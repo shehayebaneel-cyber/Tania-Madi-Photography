@@ -138,11 +138,21 @@ app.get("/api/health", async (_req, res) => {
   try { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true, studio: "Tania Madi Photography" }); }
   catch { res.status(500).json({ ok: false }); }
 });
+const INTERNAL_KEYS = ["availability"]; // config, not public content
+const isInternal = (k: string) => k.startsWith("_") || INTERNAL_KEYS.includes(k);
 app.get("/api/settings", async (_req, res) => {
   const rows = await prisma.setting.findMany();
   const out: Record<string, unknown> = {};
-  for (const r of rows) out[r.key] = r.value;
+  for (const r of rows) if (!isInternal(r.key)) out[r.key] = r.value;
   res.json(out);
+});
+// preview = published content with unpublished drafts overlaid (admin only)
+app.get("/api/settings/preview", requireAdmin, async (_req, res) => {
+  const rows = await prisma.setting.findMany();
+  const out: Record<string, unknown> = {};
+  for (const r of rows) if (!isInternal(r.key)) out[r.key] = r.value;
+  const drafts: any = rows.find((r) => r.key === "_drafts")?.value || {};
+  res.json({ ...out, ...drafts });
 });
 
 // ---------- services & packages ----------
@@ -584,14 +594,76 @@ app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => { await 
 app.get("/api/admin/services", requireAdmin, async (_req, res) => res.json(await prisma.service.findMany({ orderBy: { sortOrder: "asc" } })));
 app.patch("/api/admin/services/:slug", requireAdmin, async (req, res) => {
   const data: any = {};
-  for (const k of ["name", "tagline", "description"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  for (const k of ["name", "tagline", "description", "durationText", "locationText", "heroTone"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
   if (typeof req.body?.isActive === "boolean") data.isActive = req.body.isActive;
+  if (Array.isArray(req.body?.includes)) data.includes = req.body.includes;
+  if (Array.isArray(req.body?.faqs)) data.faqs = req.body.faqs;
   if (req.body?.durationMinutes !== undefined) data.durationMinutes = Number(req.body.durationMinutes) || 0;
-  if (req.body?.startingPrice !== undefined) data.startingPrice = req.body.startingPrice == null ? null : Number(req.body.startingPrice);
+  if (req.body?.startingPrice !== undefined) data.startingPrice = req.body.startingPrice == null || req.body.startingPrice === "" ? null : Number(req.body.startingPrice);
   res.json(await prisma.service.update({ where: { slug: req.params.slug }, data }));
 });
 
-// settings admin
+// ---------- packages admin ----------
+const packageData = (b: any) => ({
+  name: String(b.name || ""), price: b.price == null || b.price === "" ? null : Number(b.price), requestPricing: !!b.requestPricing,
+  durationText: String(b.durationText || ""), editedPhotos: String(b.editedPhotos || ""), outfits: String(b.outfits || ""),
+  features: Array.isArray(b.features) ? b.features : [], deposit: Number(b.deposit || 0), deliveryDays: String(b.deliveryDays || ""),
+  revisions: Number(b.revisions || 1), isActive: b.isActive !== false,
+});
+app.post("/api/admin/packages", requireAdmin, async (req, res) => {
+  const b = req.body || {}; if (!b.serviceSlug) return res.status(400).json({ error: "Pick a service." });
+  const max = await prisma.package.aggregate({ where: { serviceSlug: b.serviceSlug }, _max: { sortOrder: true } });
+  res.json(await prisma.package.create({ data: { serviceSlug: b.serviceSlug, ...packageData(b), sortOrder: (max._max.sortOrder ?? 0) + 1 } }));
+});
+app.put("/api/admin/packages/:id", requireAdmin, async (req, res) => res.json(await prisma.package.update({ where: { id: Number(req.params.id) }, data: packageData(req.body || {}) })));
+app.delete("/api/admin/packages/:id", requireAdmin, async (req, res) => { await prisma.package.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+
+// ---------- testimonials admin ----------
+app.get("/api/admin/testimonials", requireAdmin, async (_req, res) => res.json(await prisma.testimonial.findMany({ orderBy: { sortOrder: "asc" } })));
+const testimonialData = (b: any) => ({ name: String(b.name || ""), sessionType: String(b.sessionType || ""), text: String(b.text || ""), rating: Math.min(5, Math.max(1, Number(b.rating || 5))), tone: String(b.tone || "g-couple"), isActive: b.isActive !== false });
+app.post("/api/admin/testimonials", requireAdmin, async (req, res) => {
+  const max = await prisma.testimonial.aggregate({ _max: { sortOrder: true } });
+  res.json(await prisma.testimonial.create({ data: { ...testimonialData(req.body || {}), sortOrder: (max._max.sortOrder ?? 0) + 1 } }));
+});
+app.put("/api/admin/testimonials/:id", requireAdmin, async (req, res) => res.json(await prisma.testimonial.update({ where: { id: Number(req.params.id) }, data: testimonialData(req.body || {}) })));
+app.delete("/api/admin/testimonials/:id", requireAdmin, async (req, res) => { await prisma.testimonial.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+app.post("/api/admin/testimonials/reorder", requireAdmin, async (req, res) => {
+  const ids: number[] = Array.isArray(req.body?.ids) ? req.body.ids.map(Number) : [];
+  await prisma.$transaction(ids.map((id, i) => prisma.testimonial.update({ where: { id }, data: { sortOrder: i } })));
+  res.json({ ok: true });
+});
+
+// ---------- website content (draft → publish) ----------
+const CONTENT_KEYS = ["contact", "home", "promo", "policies", "bookingInfo"];
+app.get("/api/admin/content", requireAdmin, async (_req, res) => {
+  const rows = await prisma.setting.findMany({ where: { key: { in: [...CONTENT_KEYS, "_drafts"] } } });
+  const map: any = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  res.json({ published: Object.fromEntries(CONTENT_KEYS.map((k) => [k, map[k] || {}])), drafts: map["_drafts"] || {} });
+});
+app.put("/api/admin/content/:key", requireAdmin, async (req, res) => {
+  const key = req.params.key; if (!CONTENT_KEYS.includes(key)) return res.status(400).json({ error: "Unknown section." });
+  const drafts: any = (await prisma.setting.findUnique({ where: { key: "_drafts" } }))?.value || {};
+  drafts[key] = req.body?.value ?? req.body;
+  await prisma.setting.upsert({ where: { key: "_drafts" }, update: { value: drafts }, create: { key: "_drafts", value: drafts } });
+  res.json({ ok: true });
+});
+app.post("/api/admin/content/:key/publish", requireAdmin, async (req, res) => {
+  const key = req.params.key; if (!CONTENT_KEYS.includes(key)) return res.status(400).json({ error: "Unknown section." });
+  const drafts: any = (await prisma.setting.findUnique({ where: { key: "_drafts" } }))?.value || {};
+  if (drafts[key] === undefined) return res.status(400).json({ error: "Nothing to publish." });
+  await prisma.setting.upsert({ where: { key }, update: { value: drafts[key] }, create: { key, value: drafts[key] } });
+  delete drafts[key];
+  await prisma.setting.upsert({ where: { key: "_drafts" }, update: { value: drafts }, create: { key: "_drafts", value: drafts } });
+  res.json({ ok: true });
+});
+app.post("/api/admin/content/:key/discard", requireAdmin, async (req, res) => {
+  const drafts: any = (await prisma.setting.findUnique({ where: { key: "_drafts" } }))?.value || {};
+  delete drafts[req.params.key];
+  await prisma.setting.upsert({ where: { key: "_drafts" }, update: { value: drafts }, create: { key: "_drafts", value: drafts } });
+  res.json({ ok: true });
+});
+
+// settings admin (legacy direct write — kept for compatibility)
 app.put("/api/admin/settings/:key", requireAdmin, async (req, res) => {
   const key = req.params.key;
   const value = req.body?.value;
