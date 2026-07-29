@@ -15,6 +15,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
 const PROD = process.env.NODE_ENV === "production";
 
+// A single failed query (e.g. a transient Neon connection-pool timeout) must never
+// take the whole API down. These guards keep the process alive and just log the fault.
+process.on("unhandledRejection", (reason) => console.error("[unhandledRejection]", reason));
+process.on("uncaughtException", (err) => console.error("[uncaughtException]", err));
+
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 // Configured origins from WEB_URL, plus a resilient fallback: any *.onrender.com host and
@@ -511,12 +516,29 @@ app.get("/api/availability", async (_req, res) => {
   res.json({ workingDays: cfg.workingDays, closedDays, blackoutDates });
 });
 app.get("/api/admin/orders", requireAdmin, async (_req, res) => res.json(await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true } })));
-app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => res.json(await prisma.order.update({ where: { id: Number(req.params.id) }, data: { status: String(req.body?.status || "NEW") } })));
-app.get("/api/admin/editing", requireAdmin, async (_req, res) => res.json(await prisma.editingRequest.findMany({ orderBy: { createdAt: "desc" } })));
+app.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+  const o = await prisma.order.findUnique({ where: { id: Number(req.params.id) }, include: { items: true, customer: true } });
+  if (!o) return res.status(404).json({ error: "Not found." });
+  res.json(o);
+});
+app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+  const data: any = {};
+  for (const k of ["status", "adminNotes", "trackingCode"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  if (req.body?.amountPaid !== undefined) data.amountPaid = Number(req.body.amountPaid) || 0;
+  res.json(await prisma.order.update({ where: { id: Number(req.params.id) }, data }));
+});
+app.patch("/api/admin/order-items/:id", requireAdmin, async (req, res) => {
+  const data: any = {};
+  for (const k of ["photoStatus", "photoNote"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  res.json(await prisma.orderItem.update({ where: { id: Number(req.params.id) }, data }));
+});
+app.get("/api/admin/editing", requireAdmin, async (_req, res) => res.json(await prisma.editingRequest.findMany({ orderBy: { createdAt: "desc" }, include: { customer: true } })));
 app.patch("/api/admin/editing/:id", requireAdmin, async (req, res) => {
   const data: any = {};
-  for (const k of ["status", "previewUrl", "finalUrl"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
-  if (req.body?.quote != null) data.quote = Number(req.body.quote);
+  for (const k of ["status", "previewUrl", "finalUrl", "adminNotes"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  if (req.body?.quote != null) data.quote = req.body.quote === "" ? null : Number(req.body.quote);
+  if (req.body?.amountPaid !== undefined) data.amountPaid = Number(req.body.amountPaid) || 0;
+  if (req.body?.revisionsUsed !== undefined) data.revisionsUsed = Number(req.body.revisionsUsed) || 0;
   res.json(await prisma.editingRequest.update({ where: { id: Number(req.params.id) }, data }));
 });
 
@@ -585,10 +607,16 @@ app.post("/api/admin/portfolio/bulk", requireAdmin, async (req, res) => {
 
 // products admin
 app.get("/api/admin/products", requireAdmin, async (_req, res) => res.json(await prisma.product.findMany({ orderBy: { sortOrder: "asc" }, include: { category: true } })));
-const productInput = z.object({ categorySlug: z.string(), name: z.string().min(1), description: z.string().default(""), tone: z.string().default("g-family"), price: z.number().int().min(0), material: z.string().default(""), mount: z.string().default(""), glassOption: z.boolean().default(false), orientation: z.string().default("any"), colors: z.array(z.string()).default([]), sizes: z.array(z.object({ label: z.string(), priceDelta: z.number().int() })).default([]), stock: z.number().int().default(0), madeToOrder: z.boolean().default(false), prepTime: z.string().default(""), isActive: z.boolean().default(true), isFeatured: z.boolean().default(false) });
+const productInput = z.object({ categorySlug: z.string(), name: z.string().min(1), description: z.string().default(""), tone: z.string().default("g-family"), images: z.array(z.string()).default([]), price: z.number().int().min(0), material: z.string().default(""), style: z.string().default(""), mount: z.string().default(""), glassOption: z.boolean().default(false), orientation: z.string().default("any"), colors: z.array(z.string()).default([]), sizes: z.array(z.object({ label: z.string(), priceDelta: z.number().int() })).default([]), stock: z.number().int().default(0), madeToOrder: z.boolean().default(false), prepTime: z.string().default(""), isActive: z.boolean().default(true), isFeatured: z.boolean().default(false) });
 app.post("/api/admin/products", requireAdmin, async (req, res) => { const d = productInput.safeParse(req.body); if (!d.success) return res.status(400).json({ error: "Please fill the required fields." }); res.json(await prisma.product.create({ data: d.data })); });
 app.put("/api/admin/products/:id", requireAdmin, async (req, res) => { const d = productInput.partial().safeParse(req.body); if (!d.success) return res.status(400).json({ error: "Invalid data." }); res.json(await prisma.product.update({ where: { id: Number(req.params.id) }, data: d.data })); });
-app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => { await prisma.product.update({ where: { id: Number(req.params.id) }, data: { isActive: false } }); res.json({ ok: true }); });
+app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => {
+  try { await prisma.product.delete({ where: { id: Number(req.params.id) } }); }
+  catch { await prisma.product.update({ where: { id: Number(req.params.id) }, data: { isActive: false } }); } // has orders → just hide
+  res.json({ ok: true });
+});
+// product categories (for the product editor dropdown)
+app.get("/api/admin/product-categories", requireAdmin, async (_req, res) => res.json(await prisma.productCategory.findMany({ orderBy: { sortOrder: "asc" } })));
 
 // services admin (activate/edit)
 app.get("/api/admin/services", requireAdmin, async (_req, res) => res.json(await prisma.service.findMany({ orderBy: { sortOrder: "asc" } })));
@@ -719,5 +747,11 @@ app.post("/api/admin/notifications/seen", requireAdmin, async (_req, res) => {
 
 // media library (upload / serve / search / edit / delete)
 mountMedia(app, prisma, requireAdmin);
+
+// Last-resort error handler: return JSON 500 instead of an empty/hung response.
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("[api error]", err?.message || err);
+  if (!res.headersSent) res.status(500).json({ error: "Something went wrong. Please try again." });
+});
 
 app.listen(PORT, () => console.log(`Tania Madi API on http://localhost:${PORT}`));

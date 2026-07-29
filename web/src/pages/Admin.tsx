@@ -10,10 +10,9 @@ import { CustomersAdmin } from "../admin/Customers";
 import { WebsiteContent } from "../admin/Content";
 import { ServicesAdmin } from "../admin/Services";
 import { NotificationsAdmin, NotificationBell } from "../admin/Notifications";
+import { ProductsAdmin, OrdersAdmin, EditingAdmin } from "../admin/Shop";
 
 type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "notifications";
-const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
-const ORDER_STATUSES = ["NEW", "AWAITING_PHOTO_REVIEW", "PHOTO_APPROVED", "AWAITING_PAYMENT", "PRINTING", "FRAMING", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
 
 export default function Admin() {
   const nav = useNavigate();
@@ -59,11 +58,11 @@ export default function Admin() {
         {tab === "notifications" && <NotificationsAdmin onNavigate={(t) => setTab(t as Tab)} />}
         {tab === "content" && <WebsiteContent />}
         {tab === "services" && <ServicesAdmin />}
-        {tab === "orders" && <Orders />}
-        {tab === "editing" && <Editing />}
+        {tab === "orders" && <OrdersAdmin />}
+        {tab === "editing" && <EditingAdmin />}
         {tab === "portfolio" && <PortfolioAdmin />}
         {tab === "media" && <MediaLibrary />}
-        {tab === "products" && <Products />}
+        {tab === "products" && <ProductsAdmin />}
       </main>
     </div>
   );
@@ -99,76 +98,3 @@ function Dashboard({ name }: { name: string }) {
 }
 const Stat = ({ l, n }: { l: string; n: number }) => <div className="stat"><div className="l">{l}</div><div className="n">{n}</div></div>;
 
-function Orders() {
-  const [rows, setRows] = useState<any[]>([]);
-  const load = () => api.adminOrders().then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
-  return (
-    <>
-      <div className="ahead"><h1>Product orders</h1></div>
-      <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Ref</th><th>Customer</th><th>Items</th><th>Total</th><th>Fulfilment</th><th>Status</th></tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td colSpan={6} className="muted">No orders yet.</td></tr> : rows.map((o) => (
-            <tr key={o.id}>
-              <td>{o.reference}</td>
-              <td>{o.customerName}<div className="muted" style={{ fontSize: 12 }}>{o.phone}</div></td>
-              <td className="muted" style={{ fontSize: 13 }}>{o.items.map((i: any) => `${i.name}${i.needsEditing ? " (edit)" : ""} ×${i.qty}`).join(", ")}</td>
-              <td>${o.total}<div className="muted" style={{ fontSize: 12 }}>{o.paymentMethod}</div></td>
-              <td className="muted" style={{ fontSize: 13 }}>{o.fulfilment}{o.town ? ` · ${o.town}` : ""}</td>
-              <td><select value={o.status} onChange={async (e) => { await api.adminUpdateOrder(o.id, e.target.value); load(); }} style={sel}>{ORDER_STATUSES.map((x) => <option key={x} value={x}>{x.replace(/_/g, " ")}</option>)}</select></td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div></div>
-    </>
-  );
-}
-
-function Editing() {
-  const [rows, setRows] = useState<any[]>([]);
-  const load = () => api.adminEditing().then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
-  return (
-    <>
-      <div className="ahead"><h1>Editing requests</h1></div>
-      <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Ref</th><th>Service</th><th>Customer</th><th>Photos</th><th>Instructions</th><th>Status</th></tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td colSpan={6} className="muted">No editing requests yet.</td></tr> : rows.map((r) => (
-            <tr key={r.id}>
-              <td>{r.reference}</td><td>{r.serviceName}<div className="muted" style={{ fontSize: 12 }}>{r.complexity} · {r.speed}</div></td>
-              <td>{r.customerName}<div className="muted" style={{ fontSize: 12 }}>{r.phone}</div></td>
-              <td>{r.photoCount}</td>
-              <td className="muted" style={{ fontSize: 13, maxWidth: 240 }}>{r.instructions}</td>
-              <td><select value={r.status} onChange={async (e) => { await api.adminUpdateEditing(r.id, { status: e.target.value }); load(); }} style={sel}>{EDITING_STATUSES.map((x) => <option key={x} value={x}>{x.replace(/_/g, " ")}</option>)}</select></td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div></div>
-    </>
-  );
-}
-
-
-function Products() {
-  const [rows, setRows] = useState<any[]>([]);
-  const load = () => api.adminProducts().then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
-  return (
-    <>
-      <div className="ahead"><h1>Products</h1></div>
-      <div className="panel"><div className="table-scroll"><table>
-        <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th></tr></thead>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.id}><td>{p.name}</td><td className="muted">{p.category?.name}</td><td>${p.price}</td><td>{p.madeToOrder ? "Made to order" : p.stock}</td><td><span className={`pill ${p.isActive ? "CONFIRMED" : "CANCELLED"}`}>{p.isActive ? "Live" : "Hidden"}</span></td></tr>
-          ))}
-        </tbody>
-      </table></div></div>
-      <p className="muted" style={{ fontSize: 13 }}>Full product add/edit form comes next; products are currently managed via the seed. Orders and inventory are live above.</p>
-    </>
-  );
-}
-
-const sel: React.CSSProperties = { padding: "7px 9px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--card)", color: "var(--ink)", fontWeight: 700, fontSize: 12.5 };
