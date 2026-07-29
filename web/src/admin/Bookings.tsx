@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { ConflictBanner } from "./Availability";
 
 // ── 15 statuses (owner-facing labels + colour group) ─────────────────────────
 export const STATUSES = [
@@ -152,6 +153,7 @@ function BookingDetail({ id, services, onClose, onChanged }: { id: number; servi
                 <div className="field"><label>Start</label><input type="time" value={b.startTime || ""} onChange={(e) => setB({ ...b, startTime: e.target.value })} /></div>
                 <div className="field"><label>End</label><input type="time" value={b.endTime || ""} onChange={(e) => setB({ ...b, endTime: e.target.value })} /></div>
               </div>
+              <ConflictBanner date={b.date} startTime={b.startTime} endTime={b.endTime} serviceSlug={b.serviceSlug} excludeId={id} />
               <div className="field"><label>Location</label><input value={b.locationText || ""} onChange={(e) => setB({ ...b, locationText: e.target.value })} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                 <div className="field"><label>Total price $</label><input type="number" value={b.price ?? ""} onChange={(e) => setB({ ...b, price: e.target.value })} /></div>
@@ -243,6 +245,7 @@ function BookingForm({ services, onClose, onSaved }: { services: any[]; onClose:
           <div className="field"><label>Start</label><input type="time" value={f.startTime} onChange={(e) => set({ startTime: e.target.value })} /></div>
           <div className="field"><label>End</label><input type="time" value={f.endTime} onChange={(e) => set({ endTime: e.target.value })} /></div>
         </div>
+        <ConflictBanner date={f.date} startTime={f.startTime} endTime={f.endTime} serviceSlug={f.serviceSlug} />
         <div style={fieldRow}>
           <div className="field"><label>Setting</label><select value={f.setting} onChange={(e) => set({ setting: e.target.value })}><option value="">—</option><option value="studio">Studio</option><option value="outdoor">Outdoor</option></select></div>
           <div className="field"><label>People</label><input value={f.people} onChange={(e) => set({ people: e.target.value })} /></div>
@@ -273,10 +276,12 @@ export function CalendarAdmin() {
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [cursor, setCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }; });
   const [services, setServices] = useState<any[]>([]);
+  const [blocks, setBlocks] = useState<any[]>([]);
   const [open, setOpen] = useState<number | null>(null);
 
   const load = useCallback(() => api.adminBookings({ pageSize: 1000 }).then((r) => setAll(r.items)).catch(() => {}), []);
-  useEffect(() => { load(); api.services().then(setServices).catch(() => {}); }, [load]);
+  useEffect(() => { load(); api.services().then(setServices).catch(() => {}); api.adminBlackouts().then(setBlocks).catch(() => {}); }, [load]);
+  const blockDays = useMemo(() => new Set(blocks.filter((b) => b.allDay).map((b) => b.date)), [blocks]);
 
   const byDay = useMemo(() => { const m: Record<string, any[]> = {}; for (const b of all) { const d = effDate(b); if (d) (m[d] = m[d] || []).push(b); } return m; }, [all]);
   const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -325,8 +330,9 @@ export function CalendarAdmin() {
             {cells.map((day, i) => {
               const di = day ? iso(cursor.y, cursor.m, day) : "";
               const list = day ? (byDay[di] || []) : [];
-              return <div key={i} className={`cal-cell ${day ? "" : "empty"} ${di === todayIso ? "today" : ""}`} onClick={() => day && (setCursor((c) => ({ ...c, d: day })), setView("day"))}>
-                {day && <><span className="d">{day}</span>{list.slice(0, 3).map((b) => <span key={b.id} className="ev" style={{ background: GCOL[sGroup(b.status)][0], color: GCOL[sGroup(b.status)][1] }} onClick={(e) => { e.stopPropagation(); setOpen(b.id); }}>{b.startTime ? b.startTime + " " : ""}{b.customerName}</span>)}{list.length > 3 && <span className="more">+{list.length - 3} more</span>}</>}
+              const blocked = day && blockDays.has(di);
+              return <div key={i} className={`cal-cell ${day ? "" : "empty"} ${di === todayIso ? "today" : ""} ${blocked ? "blocked" : ""}`} onClick={() => day && (setCursor((c) => ({ ...c, d: day })), setView("day"))}>
+                {day && <><span className="d">{day}</span>{blocked && <span className="blk">Blocked</span>}{list.slice(0, 3).map((b) => <span key={b.id} className="ev" style={{ background: GCOL[sGroup(b.status)][0], color: GCOL[sGroup(b.status)][1] }} onClick={(e) => { e.stopPropagation(); setOpen(b.id); }}>{b.startTime ? b.startTime + " " : ""}{b.customerName}</span>)}{list.length > 3 && <span className="more">+{list.length - 3} more</span>}</>}
               </div>;
             })}
           </div>

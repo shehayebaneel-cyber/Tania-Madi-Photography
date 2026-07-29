@@ -396,3 +396,5 @@ footer.site .fnote{font-size:14px;max-width:30ch;margin-top:12px;line-height:1.7
 .cal-cell .ev{font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left}
 .cal-cell .more{font-size:10px;color:var(--grey)}
 @media (max-width:640px){.cal-cell{min-height:60px;padding:2px}.cal-cell .ev{font-size:8.5px;padding:1px 3px}.cal-cell .d{font-size:11px}}
+.cal-cell.blocked{background:repeating-linear-gradient(45deg,var(--crit-bg),var(--crit-bg) 6px,transparent 6px,transparent 12px)}
+.cal-cell .blk{font-size:9px;font-weight:800;color:var(--crit);text-transform:uppercase;letter-spacing:.03em}

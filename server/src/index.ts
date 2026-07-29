@@ -67,6 +67,56 @@ function dateWindow(filter: string): [string, string] | null {
   if (filter === "month") return [isoDay(som), isoDay(eom)];
   return null;
 }
+// ── availability config + conflict checking ──────────────────────────────────
+const DOW = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const DEFAULT_AVAIL = {
+  workingDays: {
+    mon: { open: true, start: "09:00", end: "18:00" }, tue: { open: true, start: "09:00", end: "18:00" },
+    wed: { open: true, start: "09:00", end: "18:00" }, thu: { open: true, start: "09:00", end: "18:00" },
+    fri: { open: true, start: "09:00", end: "18:00" }, sat: { open: true, start: "10:00", end: "16:00" },
+    sun: { open: false, start: "10:00", end: "16:00" },
+  },
+  maxPerDay: 3, allowOverlap: false, bufferMinutes: 30, defaultDurationMinutes: 120,
+};
+async function getAvailability() {
+  const s = await prisma.setting.findUnique({ where: { key: "availability" } });
+  const v: any = s?.value || {};
+  return { ...DEFAULT_AVAIL, ...v, workingDays: { ...DEFAULT_AVAIL.workingDays, ...(v.workingDays || {}) } };
+}
+const toMin = (t: string) => { const [h, m] = String(t || "").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+const rangesOverlap = (s1: number, e1: number, s2: number, e2: number) => s1 < e2 && e1 > s2;
+async function checkConflict(p: { date?: string; startTime?: string; endTime?: string; serviceSlug?: string; excludeId?: number }) {
+  const warnings: { type: string; msg: string }[] = [];
+  if (!p.date) return { warnings, count: 0 };
+  const cfg = await getAvailability();
+  const key = DOW[new Date(p.date + "T12:00:00").getDay()];
+  const wd: any = (cfg.workingDays as any)[key];
+  if (!wd || !wd.open) warnings.push({ type: "closed", msg: "This is not a normal working day." });
+  else if (p.startTime && (toMin(p.startTime) < toMin(wd.start) || toMin(p.endTime || p.startTime) > toMin(wd.end)))
+    warnings.push({ type: "hours", msg: `Outside working hours (${wd.start}–${wd.end}).` });
+  // blackouts
+  for (const bo of await prisma.blackout.findMany({ where: { date: p.date } })) {
+    if (bo.allDay) warnings.push({ type: "blackout", msg: `This day is blocked${bo.reason ? ` — ${bo.reason}` : ""}.` });
+    else if (p.startTime && rangesOverlap(toMin(p.startTime), toMin(p.endTime || p.startTime), toMin(bo.startTime), toMin(bo.endTime)))
+      warnings.push({ type: "blackout", msg: `Overlaps blocked time ${bo.startTime}–${bo.endTime}${bo.reason ? ` (${bo.reason})` : ""}.` });
+  }
+  const svc = p.serviceSlug ? await prisma.service.findUnique({ where: { slug: p.serviceSlug } }) : null;
+  const dur = svc?.durationMinutes || cfg.defaultDurationMinutes || 120;
+  const myStart = p.startTime ? toMin(p.startTime) : null;
+  const myEnd = p.endTime ? toMin(p.endTime) : myStart != null ? myStart + dur : null;
+  const active = await prisma.booking.findMany({ where: { status: { notIn: ["CANCELLED", "DECLINED", "NO_SHOW"] } } });
+  const sameDay = active.filter((b) => (b.date || b.preferredDate) === p.date && b.id !== p.excludeId);
+  if (cfg.maxPerDay && sameDay.length >= cfg.maxPerDay) warnings.push({ type: "max", msg: `Already ${sameDay.length} booking(s) that day (limit ${cfg.maxPerDay}).` });
+  if (!cfg.allowOverlap && myStart != null && myEnd != null) {
+    const buf = cfg.bufferMinutes || 0;
+    for (const b of sameDay) {
+      if (!b.startTime) continue;
+      const bs = toMin(b.startTime), be = b.endTime ? toMin(b.endTime) : bs + (cfg.defaultDurationMinutes || 120);
+      if (rangesOverlap(myStart, myEnd, bs - buf, be + buf)) warnings.push({ type: "overlap", msg: `Overlaps ${b.customerName}'s session (${b.startTime}${b.endTime ? "–" + b.endTime : ""}).` });
+    }
+  }
+  return { warnings, count: sameDay.length };
+}
 
 // ---------- health & settings ----------
 app.get("/api/health", async (_req, res) => {
@@ -364,6 +414,32 @@ app.get("/api/admin/customers-search", requireAdmin, async (req, res) => {
   const q = String(req.query.q || "").trim(); if (q.length < 2) return res.json([]);
   res.json(await prisma.customer.findMany({ where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }] }, take: 8, select: { id: true, name: true, phone: true, email: true, whatsapp: true, instagram: true } }));
 });
+
+// ---------- availability & conflict prevention ----------
+app.get("/api/admin/availability", requireAdmin, async (_req, res) => res.json(await getAvailability()));
+app.put("/api/admin/availability", requireAdmin, async (req, res) => {
+  const value = { ...(await getAvailability()), ...(req.body || {}) };
+  await prisma.setting.upsert({ where: { key: "availability" }, update: { value }, create: { key: "availability", value } });
+  res.json(value);
+});
+app.get("/api/admin/blackouts", requireAdmin, async (_req, res) => res.json(await prisma.blackout.findMany({ orderBy: { date: "asc" } })));
+app.post("/api/admin/blackouts", requireAdmin, async (req, res) => {
+  const b = req.body || {}; if (!b.date) return res.status(400).json({ error: "Pick a date." });
+  res.json(await prisma.blackout.create({ data: { date: String(b.date), allDay: b.allDay !== false, startTime: b.startTime || "", endTime: b.endTime || "", reason: b.reason || "" } }));
+});
+app.delete("/api/admin/blackouts/:id", requireAdmin, async (req, res) => { await prisma.blackout.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+app.post("/api/admin/bookings/check-conflict", requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  res.json(await checkConflict({ date: b.date, startTime: b.startTime, endTime: b.endTime, serviceSlug: b.serviceSlug, excludeId: b.excludeId ? Number(b.excludeId) : undefined }));
+});
+// public: working days + upcoming all-day blocked dates (so the booking form can grey them out)
+app.get("/api/availability", async (_req, res) => {
+  const cfg = await getAvailability();
+  const today = isoDay(new Date());
+  const blackoutDates = (await prisma.blackout.findMany({ where: { allDay: true, date: { gte: today } }, select: { date: true } })).map((b) => b.date);
+  const closedDays = Object.entries(cfg.workingDays).filter(([, v]: any) => !v.open).map(([k]) => DOW.indexOf(k));
+  res.json({ workingDays: cfg.workingDays, closedDays, blackoutDates });
+});
 app.get("/api/admin/orders", requireAdmin, async (_req, res) => res.json(await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true } })));
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => res.json(await prisma.order.update({ where: { id: Number(req.params.id) }, data: { status: String(req.body?.status || "NEW") } })));
 app.get("/api/admin/editing", requireAdmin, async (_req, res) => res.json(await prisma.editingRequest.findMany({ orderBy: { createdAt: "desc" } })));
@@ -450,6 +526,7 @@ app.patch("/api/admin/services/:slug", requireAdmin, async (req, res) => {
   const data: any = {};
   for (const k of ["name", "tagline", "description"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
   if (typeof req.body?.isActive === "boolean") data.isActive = req.body.isActive;
+  if (req.body?.durationMinutes !== undefined) data.durationMinutes = Number(req.body.durationMinutes) || 0;
   if (req.body?.startingPrice !== undefined) data.startingPrice = req.body.startingPrice == null ? null : Number(req.body.startingPrice);
   res.json(await prisma.service.update({ where: { slug: req.params.slug }, data }));
 });

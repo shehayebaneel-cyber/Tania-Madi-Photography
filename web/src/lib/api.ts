@@ -45,7 +45,7 @@ export interface Package {
 }
 export interface Service {
   slug: string; name: string; tagline: string; description: string;
-  includes: string[]; durationText: string; locationText: string;
+  includes: string[]; durationText: string; durationMinutes?: number; locationText: string;
   startingPrice: number | null; faqs: { q: string; a: string }[];
   heroTone: string; isActive: boolean; packages: Package[];
 }
@@ -135,6 +135,14 @@ export const api = {
   adminDuplicateBooking: (id: number) => req<any>(`/api/admin/bookings/${id}/duplicate`, { method: "POST" }),
   adminDeleteBooking: (id: number) => req<any>(`/api/admin/bookings/${id}`, { method: "DELETE" }),
   adminCustomerSearch: (q: string) => req<any[]>(`/api/admin/customers-search` + qs({ q })),
+  adminAvailability: () => req<any>("/api/admin/availability"),
+  adminUpdateAvailability: (b: unknown) => req<any>("/api/admin/availability", { method: "PUT", body: JSON.stringify(b) }),
+  adminBlackouts: () => req<any[]>("/api/admin/blackouts"),
+  adminCreateBlackout: (b: unknown) => req<any>("/api/admin/blackouts", { method: "POST", body: JSON.stringify(b) }),
+  adminDeleteBlackout: (id: number) => req<any>(`/api/admin/blackouts/${id}`, { method: "DELETE" }),
+  adminCheckConflict: (b: unknown) => req<{ warnings: { type: string; msg: string }[]; count: number }>("/api/admin/bookings/check-conflict", { method: "POST", body: JSON.stringify(b) }),
+  adminServices: () => req<Service[]>("/api/admin/services"),
+  adminUpdateService: (slug: string, b: unknown) => req<Service>(`/api/admin/services/${slug}`, { method: "PATCH", body: JSON.stringify(b) }),
   adminOrders: () => req<any[]>("/api/admin/orders"),
   adminUpdateOrder: (id: number, status: string) => req<any>(`/api/admin/orders/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminEditing: () => req<any[]>("/api/admin/editing"),

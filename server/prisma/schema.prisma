@@ -79,6 +79,7 @@ model Service {
   description    String    @default("")
   includes       Json      @default("[]") // string[]
   durationText   String    @default("")
+  durationMinutes Int      @default(120) // used for scheduling / conflict checks
   locationText   String    @default("") // studio / outdoor
   startingPrice  Int? // null => request pricing
   faqs           Json      @default("[]") // {q,a}[]
@@ -188,6 +189,19 @@ model Booking {
   events        BookingEvent[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// Blocked days / hours — holidays, studio closures, personal unavailable time.
+model Blackout {
+  id        Int      @id @default(autoincrement())
+  date      String // YYYY-MM-DD
+  allDay    Boolean  @default(true)
+  startTime String   @default("") // HH:MM (when not all-day)
+  endTime   String   @default("")
+  reason    String   @default("") // holiday | closure | personal | other
+  createdAt DateTime @default(now())
+
+  @@index([date])
 }
 
 // Timeline / audit log for a booking (status changes + notes).
