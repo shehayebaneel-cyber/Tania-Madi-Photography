@@ -21,7 +21,31 @@ model AdminUser {
   email        String   @unique
   passwordHash String
   name         String   @default("")
+  role         String   @default("owner") // owner | staff
   createdAt    DateTime @default(now())
+}
+
+// Editable WhatsApp / email message templates (with {placeholders}).
+model MessageTemplate {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  label     String
+  body      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// Audit trail of admin changes.
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int?
+  adminName String   @default("")
+  method    String   @default("")
+  path      String   @default("")
+  summary   String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // Central media library. Uploaded photos are processed to WebP (full + thumb)
@@ -266,6 +290,8 @@ model Order {
   deliveryFee   Int         @default(0)
   discount      Int         @default(0)
   total         Int         @default(0)
+  amountPaid    Int         @default(0)
+  adminNotes    String      @default("")
   items         OrderItem[]
   customerId    Int?
   customer      Customer?   @relation(fields: [customerId], references: [id])
@@ -282,6 +308,8 @@ model OrderItem {
   name        String
   options     Json     @default("{}") // {size,color,orientation,finish...}
   uploadUrl   String   @default("") // customer-uploaded photo (private)
+  photoStatus String   @default("") // "" | pending | approved | rejected
+  photoNote   String   @default("")
   needsEditing Boolean @default(false)
   instructions String  @default("")
   price       Int
@@ -316,6 +344,8 @@ model EditingRequest {
   notes         String   @default("")
   status        String   @default("NEW") // NEW,REVIEW,QUOTED,AWAITING_APPROVAL,AWAITING_PAYMENT,EDITING,PREVIEW,REVISION,APPROVED,DELIVERED,CANCELLED
   quote         Int?
+  amountPaid    Int      @default(0)
+  adminNotes    String   @default("")
   previewUrl    String   @default("")
   finalUrl      String   @default("")
   revisionsUsed Int      @default(0)

@@ -670,6 +670,53 @@ app.put("/api/admin/settings/:key", requireAdmin, async (req, res) => {
   res.json(await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } }));
 });
 
+// ---------- message templates ----------
+const DEFAULT_TEMPLATES = [
+  { key: "received", label: "Booking request received", body: "Hi {name}! Thank you for your booking request for {service}. I've received it and will get back to you shortly to confirm the details. — Tania Madi Photography" },
+  { key: "quote", label: "Quotation sent", body: "Hi {name}, here's the quote for your {service} session: {price}. Let me know if you'd like to go ahead and I'll reserve your date 😊" },
+  { key: "confirmed", label: "Date confirmed", body: "Great news {name}! Your {service} session on {date} is confirmed. Looking forward to it ✨" },
+  { key: "deposit_required", label: "Deposit required", body: "Hi {name}, to lock in your {service} date on {date}, a deposit of {deposit} is required (Whish or cash). Thank you!" },
+  { key: "deposit_received", label: "Deposit received", body: "Thank you {name}! I've received your deposit of {deposit}. Your {service} session on {date} is now secured 💛" },
+  { key: "reminder", label: "Booking reminder", body: "Hi {name}! A little reminder about your {service} session on {date}{time}. Can't wait! Let me know if you have any questions." },
+  { key: "rescheduled", label: "Booking rescheduled", body: "Hi {name}, your {service} session has been rescheduled to {date}{time}. See you then!" },
+  { key: "cancelled", label: "Booking cancelled", body: "Hi {name}, your {service} booking has been cancelled. If this was a mistake or you'd like to rebook, just let me know." },
+  { key: "photos_ready", label: "Photos ready (preview)", body: "Hi {name}! Your photos from the {service} session are ready to preview — I'll send the gallery link shortly 📸" },
+  { key: "delivered", label: "Final files delivered", body: "Hi {name}, your final edited photos from {service} are ready and delivered! Thank you for trusting me with your memories 💛" },
+];
+app.get("/api/admin/templates", requireAdmin, async (_req, res) => {
+  let rows = await prisma.messageTemplate.findMany({ orderBy: { sortOrder: "asc" } });
+  if (rows.length === 0) { await prisma.messageTemplate.createMany({ data: DEFAULT_TEMPLATES.map((t, i) => ({ ...t, sortOrder: i })) }); rows = await prisma.messageTemplate.findMany({ orderBy: { sortOrder: "asc" } }); }
+  res.json(rows);
+});
+app.put("/api/admin/templates/:id", requireAdmin, async (req, res) => res.json(await prisma.messageTemplate.update({ where: { id: Number(req.params.id) }, data: { label: String(req.body?.label || ""), body: String(req.body?.body || "") } })));
+app.post("/api/admin/templates", requireAdmin, async (req, res) => { const max = await prisma.messageTemplate.aggregate({ _max: { sortOrder: true } }); res.json(await prisma.messageTemplate.create({ data: { key: "custom_" + Date.now(), label: String(req.body?.label || "New template"), body: String(req.body?.body || ""), sortOrder: (max._max.sortOrder ?? 0) + 1 } })); });
+app.delete("/api/admin/templates/:id", requireAdmin, async (req, res) => { await prisma.messageTemplate.delete({ where: { id: Number(req.params.id) } }); res.json({ ok: true }); });
+
+// ---------- in-admin notifications ----------
+app.get("/api/admin/notifications", requireAdmin, async (_req, res) => {
+  const seen = String((await prisma.setting.findUnique({ where: { key: "_notifSeen" } }))?.value || "1970-01-01T00:00:00Z");
+  const since = new Date(seen);
+  const [bc, oc, ec, bookings, orders, editing] = await Promise.all([
+    prisma.booking.count({ where: { createdAt: { gt: since } } }),
+    prisma.order.count({ where: { createdAt: { gt: since } } }),
+    prisma.editingRequest.count({ where: { createdAt: { gt: since } } }),
+    prisma.booking.findMany({ orderBy: { createdAt: "desc" }, take: 15 }),
+    prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+    prisma.editingRequest.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+  ]);
+  const items = [
+    ...bookings.map((b) => ({ type: "booking", id: b.id, title: `Booking · ${b.customerName}`, sub: b.serviceName || "", at: b.createdAt, isNew: b.createdAt > since })),
+    ...orders.map((o) => ({ type: "order", id: o.id, title: `Order · ${o.customerName}`, sub: o.reference, at: o.createdAt, isNew: o.createdAt > since })),
+    ...editing.map((e) => ({ type: "editing", id: e.id, title: `Editing · ${e.customerName}`, sub: e.serviceName || "", at: e.createdAt, isNew: e.createdAt > since })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 20);
+  res.json({ count: bc + oc + ec, items, seenAt: seen });
+});
+app.post("/api/admin/notifications/seen", requireAdmin, async (_req, res) => {
+  const now = new Date().toISOString();
+  await prisma.setting.upsert({ where: { key: "_notifSeen" }, update: { value: now }, create: { key: "_notifSeen", value: now } });
+  res.json({ ok: true });
+});
+
 // media library (upload / serve / search / edit / delete)
 mountMedia(app, prisma, requireAdmin);
 

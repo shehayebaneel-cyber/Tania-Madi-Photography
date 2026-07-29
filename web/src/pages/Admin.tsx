@@ -9,8 +9,9 @@ import { AvailabilityAdmin } from "../admin/Availability";
 import { CustomersAdmin } from "../admin/Customers";
 import { WebsiteContent } from "../admin/Content";
 import { ServicesAdmin } from "../admin/Services";
+import { NotificationsAdmin, NotificationBell } from "../admin/Notifications";
 
-type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products";
+type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "notifications";
 const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
 const ORDER_STATUSES = ["NEW", "AWAITING_PHOTO_REVIEW", "PHOTO_APPROVED", "AWAITING_PAYMENT", "PRINTING", "FRAMING", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
 
@@ -33,6 +34,7 @@ export default function Admin() {
       <aside className="aside">
         <div className="brand"><Logo light /></div>
         {nl("dashboard", "Dashboard", <Ico d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" />)}
+        <NotificationBell onOpen={() => setTab("notifications")} />
         {nl("bookings", "Bookings", <Ico d="M8 2v3M16 2v3M3 8h18M4 5h16v16H4z" />)}
         {nl("calendar", "Calendar", <Ico d="M8 2v3M16 2v3M4 5h16v16H4zM3 9h18M8 13h2M14 13h2M8 17h2M14 17h2" />)}
         {nl("availability", "Availability", <Ico d="M12 6v6l4 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" />)}
@@ -54,6 +56,7 @@ export default function Admin() {
         {tab === "calendar" && <CalendarAdmin />}
         {tab === "availability" && <AvailabilityAdmin />}
         {tab === "customers" && <CustomersAdmin />}
+        {tab === "notifications" && <NotificationsAdmin onNavigate={(t) => setTab(t as Tab)} />}
         {tab === "content" && <WebsiteContent />}
         {tab === "services" && <ServicesAdmin />}
         {tab === "orders" && <Orders />}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { ConflictBanner } from "./Availability";
+import { SendMessageModal } from "./Notifications";
 
 // ── 15 statuses (owner-facing labels + colour group) ─────────────────────────
 export const STATUSES = [
@@ -104,6 +105,7 @@ function BookingDetail({ id, services, onClose, onChanged }: { id: number; servi
   const [b, setB] = useState<any>(null);
   const [note, setNote] = useState("");
   const [edit, setEdit] = useState(false);
+  const [sendMsg, setSendMsg] = useState(false);
   const load = useCallback(() => api.adminBooking(id).then(setB).catch(() => {}), [id]);
   useEffect(() => { load(); }, [load]);
   if (!b) return <div className="modal-back" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><p className="muted">Loading…</p></div></div>;
@@ -132,7 +134,7 @@ function BookingDetail({ id, services, onClose, onChanged }: { id: number; servi
         <div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
             <a className="btn btn-gold btn-sm" href={waLink(b)} target="_blank" rel="noreferrer">💬 WhatsApp</a>
-            {b.email && <a className="btn btn-sm" href={`mailto:${b.email}`}>✉ Email</a>}
+            <button className="btn btn-sm" onClick={() => setSendMsg(true)}>✉ Send message</button>
             <button className="btn btn-sm" onClick={() => setEdit((v) => !v)}>{edit ? "Done editing" : "Edit details"}</button>
             <button className="btn btn-sm" onClick={() => window.print()}>Print</button>
             <button className="btn btn-sm" onClick={async () => { await api.adminDuplicateBooking(id); onChanged(); onClose(); }}>Duplicate</button>
@@ -200,6 +202,7 @@ function BookingDetail({ id, services, onClose, onChanged }: { id: number; servi
           </div>
         </div>
       </div>
+      {sendMsg && <SendMessageModal booking={b} onClose={() => setSendMsg(false)} />}
     </div></div>
   );
 }

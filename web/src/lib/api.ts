@@ -163,6 +163,13 @@ export const api = {
   adminCreateTestimonial: (b: unknown) => req<any>("/api/admin/testimonials", { method: "POST", body: JSON.stringify(b) }),
   adminUpdateTestimonial: (id: number, b: unknown) => req<any>(`/api/admin/testimonials/${id}`, { method: "PUT", body: JSON.stringify(b) }),
   adminDeleteTestimonial: (id: number) => req<any>(`/api/admin/testimonials/${id}`, { method: "DELETE" }),
+  // message templates + notifications
+  adminTemplates: () => req<any[]>("/api/admin/templates"),
+  adminUpdateTemplate: (id: number, b: unknown) => req<any>(`/api/admin/templates/${id}`, { method: "PUT", body: JSON.stringify(b) }),
+  adminCreateTemplate: (b: unknown) => req<any>("/api/admin/templates", { method: "POST", body: JSON.stringify(b) }),
+  adminDeleteTemplate: (id: number) => req<any>(`/api/admin/templates/${id}`, { method: "DELETE" }),
+  adminNotifications: () => req<{ count: number; items: any[]; seenAt: string }>("/api/admin/notifications"),
+  adminMarkNotificationsSeen: () => req<any>("/api/admin/notifications/seen", { method: "POST" }),
   adminOrders: () => req<any[]>("/api/admin/orders"),
   adminUpdateOrder: (id: number, status: string) => req<any>(`/api/admin/orders/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminEditing: () => req<any[]>("/api/admin/editing"),
