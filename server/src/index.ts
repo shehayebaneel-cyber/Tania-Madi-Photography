@@ -39,8 +39,41 @@ app.use(
   })
 );
 
+// ── admin audit trail ────────────────────────────────────────────────────────
+// Turn a write request into a short human line for the activity feed.
+function activitySummary(method: string, path: string) {
+  const parts = path.replace("/api/admin/", "").split("/").filter(Boolean);
+  const resource = (parts[0] || "").replace(/-/g, " ");
+  const id = parts.find((p) => /^\d+$/.test(p));
+  const verb = /\/publish$/.test(path) ? "Published" : /\/discard$/.test(path) ? "Discarded"
+    : /\/reorder$/.test(path) ? "Reordered" : method === "POST" ? "Added" : method === "DELETE" ? "Removed" : "Updated";
+  if (/\/(publish|discard)$/.test(path)) return `${verb} ${resource} “${parts[1] || ""}”`.trim();
+  return `${verb} ${resource.replace(/s$/, "")}${id ? " #" + id : ""}`.trim();
+}
+const AUDIT_SKIP = /\/(login|logout|notifications)/;
+// Record every successful admin write. Runs on res "finish" so req.adminId is set and we know the outcome.
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/admin") && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && !AUDIT_SKIP.test(req.path)) {
+    res.on("finish", () => {
+      const adminId = (req as any).adminId as number | undefined;
+      if (res.statusCode >= 400 || !adminId) return;
+      prisma.adminUser.findUnique({ where: { id: adminId } })
+        .then((u) => prisma.activityLog.create({ data: { adminId, adminName: u?.name || "", method: req.method, path: req.path, summary: activitySummary(req.method, req.path) } }))
+        .catch(() => {});
+    });
+  }
+  next();
+});
+
 function ref(prefix: string) {
   return prefix + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
+}
+async function requireOwner(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = await prisma.adminUser.findUnique({ where: { id: (req as any).adminId } });
+    if (!u || u.role !== "owner") return res.status(403).json({ error: "Only the studio owner can do this." });
+    next();
+  } catch (e) { next(e); }
 }
 function cookieOpts() {
   return { httpOnly: true, sameSite: (PROD ? "none" : "lax") as "none" | "lax", secure: PROD, maxAge: 7 * 24 * 3600 * 1000 };
@@ -341,7 +374,7 @@ app.post("/api/admin/login", async (req, res) => {
 app.post("/api/admin/logout", (_req, res) => { res.clearCookie("tm_admin", { sameSite: PROD ? "none" : "lax", secure: PROD }); res.json({ ok: true }); });
 app.get("/api/admin/me", requireAdmin, async (req, res) => {
   const u = await prisma.adminUser.findUnique({ where: { id: (req as any).adminId } });
-  res.json({ name: u?.name, email: u?.email });
+  res.json({ name: u?.name, email: u?.email, role: u?.role || "staff" });
 });
 app.get("/api/admin/stats", requireAdmin, async (_req, res) => {
   const all = await prisma.booking.findMany({ orderBy: { createdAt: "desc" } });
@@ -743,6 +776,71 @@ app.post("/api/admin/notifications/seen", requireAdmin, async (_req, res) => {
   const now = new Date().toISOString();
   await prisma.setting.upsert({ where: { key: "_notifSeen" }, update: { value: now }, create: { key: "_notifSeen", value: now } });
   res.json({ ok: true });
+});
+
+// ---------- activity log ----------
+app.get("/api/admin/activity", requireAdmin, async (_req, res) => {
+  res.json(await prisma.activityLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }));
+});
+
+// ---------- team management (owner only) ----------
+const teamSelect = { id: true, email: true, name: true, role: true, createdAt: true } as const;
+app.get("/api/admin/team", requireAdmin, requireOwner, async (_req, res) => {
+  res.json(await prisma.adminUser.findMany({ orderBy: { createdAt: "asc" }, select: teamSelect }));
+});
+app.post("/api/admin/team", requireAdmin, requireOwner, async (req, res) => {
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  const password = String(req.body?.password || "");
+  if (!email || password.length < 6) return res.status(400).json({ error: "Email and a password of at least 6 characters are required." });
+  if (await prisma.adminUser.findUnique({ where: { email } })) return res.status(400).json({ error: "That email is already registered." });
+  const role = req.body?.role === "owner" ? "owner" : "staff";
+  const u = await prisma.adminUser.create({ data: { email, name: String(req.body?.name || ""), role, passwordHash: await bcrypt.hash(password, 10) }, select: teamSelect });
+  res.json(u);
+});
+app.patch("/api/admin/team/:id", requireAdmin, requireOwner, async (req, res) => {
+  const id = Number(req.params.id);
+  const data: any = {};
+  if (typeof req.body?.name === "string") data.name = req.body.name;
+  if (req.body?.role === "owner" || req.body?.role === "staff") data.role = req.body.role;
+  if (req.body?.password) { if (String(req.body.password).length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." }); data.passwordHash = await bcrypt.hash(String(req.body.password), 10); }
+  if (data.role === "staff") { // never demote the last owner
+    const target = await prisma.adminUser.findUnique({ where: { id } });
+    if (target?.role === "owner" && (await prisma.adminUser.count({ where: { role: "owner" } })) <= 1) return res.status(400).json({ error: "There must always be at least one owner." });
+  }
+  res.json(await prisma.adminUser.update({ where: { id }, data, select: teamSelect }));
+});
+app.delete("/api/admin/team/:id", requireAdmin, requireOwner, async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === (req as any).adminId) return res.status(400).json({ error: "You can't remove your own account." });
+  const target = await prisma.adminUser.findUnique({ where: { id } });
+  if (target?.role === "owner" && (await prisma.adminUser.count({ where: { role: "owner" } })) <= 1) return res.status(400).json({ error: "There must always be at least one owner." });
+  await prisma.adminUser.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
+// change your own password (any signed-in admin)
+app.post("/api/admin/password", requireAdmin, async (req, res) => {
+  const current = String(req.body?.current || ""); const next = String(req.body?.next || "");
+  if (next.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters." });
+  const u = await prisma.adminUser.findUnique({ where: { id: (req as any).adminId } });
+  if (!u || !(await bcrypt.compare(current, u.passwordHash))) return res.status(400).json({ error: "Your current password is incorrect." });
+  await prisma.adminUser.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(next, 10) } });
+  res.json({ ok: true });
+});
+
+// ---------- full data backup (owner only) — business data as downloadable JSON ----------
+app.get("/api/admin/backup", requireAdmin, requireOwner, async (_req, res) => {
+  const [services, packages, products, productCategories, bookings, bookingEvents, orders, orderItems, editingRequests, customers, testimonials, portfolioItems, portfolioCategories, blackouts, settings, templates, adminUsers] = await Promise.all([
+    prisma.service.findMany(), prisma.package.findMany(), prisma.product.findMany(), prisma.productCategory.findMany(),
+    prisma.booking.findMany(), prisma.bookingEvent.findMany(), prisma.order.findMany(), prisma.orderItem.findMany(),
+    prisma.editingRequest.findMany(), prisma.customer.findMany(), prisma.testimonial.findMany(), prisma.portfolioItem.findMany(),
+    prisma.portfolioCategory.findMany(), prisma.blackout.findMany(), prisma.setting.findMany(), prisma.messageTemplate.findMany(),
+    prisma.adminUser.findMany({ select: teamSelect }),
+  ]);
+  const backup = { exportedAt: new Date().toISOString(), note: "Uploaded photos/media are stored separately and not included in this data backup.", services, packages, products, productCategories, bookings, bookingEvents, orders, orderItems, editingRequests, customers, testimonials, portfolioItems, portfolioCategories, blackouts, settings, templates, adminUsers };
+  res.setHeader("Content-Disposition", `attachment; filename="tania-backup-${isoDay(new Date())}.json"`);
+  res.setHeader("Content-Type", "application/json");
+  res.send(JSON.stringify(backup, null, 2));
 });
 
 // media library (upload / serve / search / edit / delete)

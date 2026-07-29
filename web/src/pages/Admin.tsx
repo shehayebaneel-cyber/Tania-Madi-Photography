@@ -11,29 +11,38 @@ import { WebsiteContent } from "../admin/Content";
 import { ServicesAdmin } from "../admin/Services";
 import { NotificationsAdmin, NotificationBell } from "../admin/Notifications";
 import { ProductsAdmin, OrdersAdmin, EditingAdmin } from "../admin/Shop";
+import { SettingsAdmin } from "../admin/Settings";
 
-type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "notifications";
+type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "content" | "services" | "orders" | "editing" | "portfolio" | "media" | "products" | "notifications" | "settings";
 
 export default function Admin() {
   const nav = useNavigate();
   const [ok, setOk] = useState(false);
   const [name, setName] = useState("");
+  const [role, setRole] = useState("staff");
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [drawer, setDrawer] = useState(false);
 
-  useEffect(() => { api.adminMe().then((u) => { setName(u.name); setOk(true); }).catch(() => nav("/admin/login")); }, [nav]);
+  useEffect(() => { api.adminMe().then((u) => { setName(u.name); setRole(u.role); setOk(true); }).catch(() => nav("/admin/login")); }, [nav]);
   if (!ok) return <div className="spinner" />;
 
   async function logout() { await api.adminLogout().catch(() => {}); nav("/admin/login"); }
+  const go = (t: Tab) => { setTab(t); setDrawer(false); };
   const nl = (t: Tab, label: string, icon: React.ReactNode) => (
-    <button className={`navlink ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>{icon}{label}</button>
+    <button className={`navlink ${tab === t ? "on" : ""}`} onClick={() => go(t)}>{icon}{label}</button>
   );
 
   return (
     <div className="admin">
-      <aside className="aside">
+      <div className="atopbar">
+        <button className="burger" onClick={() => setDrawer(true)} aria-label="Open menu"><Ico d="M3 6h18M3 12h18M3 18h18" /></button>
+        <span className="t">Tania Madi · Admin</span>
+      </div>
+      {drawer && <div className="abackdrop" onClick={() => setDrawer(false)} />}
+      <aside className={`aside ${drawer ? "open" : ""}`}>
         <div className="brand"><Logo light /></div>
         {nl("dashboard", "Dashboard", <Ico d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" />)}
-        <NotificationBell onOpen={() => setTab("notifications")} />
+        <NotificationBell onOpen={() => go("notifications")} />
         {nl("bookings", "Bookings", <Ico d="M8 2v3M16 2v3M3 8h18M4 5h16v16H4z" />)}
         {nl("calendar", "Calendar", <Ico d="M8 2v3M16 2v3M4 5h16v16H4zM3 9h18M8 13h2M14 13h2M8 17h2M14 17h2" />)}
         {nl("availability", "Availability", <Ico d="M12 6v6l4 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" />)}
@@ -45,6 +54,7 @@ export default function Admin() {
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
         {nl("media", "Media Library", <Ico d="M4 4h16v16H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />)}
         {nl("products", "Products", <Ico d="M3 7h18M3 12h18M3 17h18" />)}
+        {nl("settings", "Settings", <Ico d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />)}
         <div className="spacer" />
         <button className="navlink" onClick={() => nav("/")}><Ico d="M3 12l9-9 9 9M5 10v10h14V10" />View site</button>
         <button className="navlink" onClick={logout}><Ico d="M16 17l5-5-5-5M21 12H9M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />Sign out</button>
@@ -63,6 +73,7 @@ export default function Admin() {
         {tab === "portfolio" && <PortfolioAdmin />}
         {tab === "media" && <MediaLibrary />}
         {tab === "products" && <ProductsAdmin />}
+        {tab === "settings" && <SettingsAdmin role={role} />}
       </main>
     </div>
   );

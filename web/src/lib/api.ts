@@ -125,8 +125,16 @@ export const api = {
   // admin
   adminLogin: (email: string, password: string) => req<{ ok: true; name: string }>("/api/admin/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   adminLogout: () => req<{ ok: true }>("/api/admin/logout", { method: "POST" }),
-  adminMe: () => req<{ name: string; email: string }>("/api/admin/me"),
+  adminMe: () => req<{ name: string; email: string; role: string }>("/api/admin/me"),
   adminStats: () => req<any>("/api/admin/stats"),
+  // Phase 9 — activity, team, backup
+  adminActivity: () => req<{ id: number; adminName: string; method: string; path: string; summary: string; createdAt: string }[]>("/api/admin/activity"),
+  adminTeam: () => req<{ id: number; email: string; name: string; role: string; createdAt: string }[]>("/api/admin/team"),
+  adminCreateTeam: (b: { email: string; name: string; password: string; role: string }) => req<any>("/api/admin/team", { method: "POST", body: JSON.stringify(b) }),
+  adminUpdateTeam: (id: number, b: { name?: string; role?: string; password?: string }) => req<any>(`/api/admin/team/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  adminDeleteTeam: (id: number) => req<any>(`/api/admin/team/${id}`, { method: "DELETE" }),
+  adminBackup: () => req<any>("/api/admin/backup"),
+  adminChangePassword: (current: string, next: string) => req<any>("/api/admin/password", { method: "POST", body: JSON.stringify({ current, next }) }),
   adminBookings: (p?: { q?: string; status?: string; service?: string; filter?: string; payment?: string; page?: number; pageSize?: number }) =>
     req<{ items: any[]; total: number; page: number; pageSize: number }>("/api/admin/bookings" + qs({ q: p?.q, status: p?.status, service: p?.service, filter: p?.filter, payment: p?.payment, page: p?.page ? String(p.page) : undefined, pageSize: p?.pageSize ? String(p.pageSize) : undefined })),
   adminBooking: (id: number) => req<any>(`/api/admin/bookings/${id}`),
