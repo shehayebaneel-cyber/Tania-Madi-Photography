@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type Service } from "../lib/api";
+import { useSite } from "../lib/site";
 
 const HEARD = ["Instagram", "A friend", "Google", "Facebook", "Repeat client", "Other"];
 
 export default function Book() {
   const nav = useNavigate();
+  const { bookingInfo } = useSite();
   const [params] = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
   const [step, setStep] = useState(1);
@@ -64,6 +66,7 @@ export default function Book() {
       <section>
         <div className="wrap" style={{ maxWidth: 720 }}>
           <div className="steps-bar">{[1, 2, 3, 4].map((n) => <div key={n} className={n <= step ? "on" : ""} />)}</div>
+          {bookingInfo && <div className="callout" style={{ whiteSpace: "pre-line", marginBottom: 16 }}>{bookingInfo}</div>}
           {error && <div className="notice err">{error}</div>}
           <div className="form-card">
 

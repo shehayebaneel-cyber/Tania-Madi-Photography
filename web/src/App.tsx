@@ -14,6 +14,7 @@ import Confirm from "./pages/Confirm";
 import Account from "./pages/Account";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Policies from "./pages/Policies";
 import AdminLogin from "./pages/AdminLogin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/policies" element={<Policies />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<NotFound />} />

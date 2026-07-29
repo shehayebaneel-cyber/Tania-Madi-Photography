@@ -76,6 +76,7 @@ function Footer() {
               <li><Link to="/editing">Photo Editing</Link></li>
               <li><Link to="/account">My Account</Link></li>
               <li><Link to="/cart">Cart</Link></li>
+              <li><Link to="/policies">Policies</Link></li>
             </ul>
           </div>
           <div>

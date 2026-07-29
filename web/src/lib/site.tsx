@@ -7,6 +7,7 @@ interface Contact {
 }
 interface Site {
   contact: Contact; home: Record<string, string>; promo: Record<string, any>;
+  policies: string; bookingInfo: string;
   waLink: string; telLink: string; preview: boolean;
 }
 const FALLBACK: Contact = {
@@ -14,7 +15,7 @@ const FALLBACK: Contact = {
   instagram: "taniamadi_photography", instagramUrl: "https://instagram.com/taniamadi_photography",
   address: "3rd floor, Adico Building, Piscine Street, Aley, Lebanon", hours: "By appointment · Mon–Sat", mapUrl: "",
 };
-const Ctx = createContext<Site>({ contact: FALLBACK, home: {}, promo: {}, waLink: "#", telLink: "#", preview: false });
+const Ctx = createContext<Site>({ contact: FALLBACK, home: {}, promo: {}, policies: "", bookingInfo: "", waLink: "#", telLink: "#", preview: false });
 
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>({});
@@ -29,6 +30,8 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   if (d && !d.startsWith("961")) d = "961" + d.replace(/^0/, "");
   const waLink = d ? `https://wa.me/${d}` : "https://instagram.com/taniamadi_photography";
   const telLink = contact.phone ? `tel:${contact.phone.replace(/\s/g, "")}` : "#";
-  return <Ctx.Provider value={{ contact, home: settings.home || {}, promo: settings.promo || {}, waLink, telLink, preview }}>{children}</Ctx.Provider>;
+  const policies = (settings.policies?.text || "").trim();
+  const bookingInfo = (settings.bookingInfo?.text || "").trim();
+  return <Ctx.Provider value={{ contact, home: settings.home || {}, promo: settings.promo || {}, policies, bookingInfo, waLink, telLink, preview }}>{children}</Ctx.Provider>;
 }
 export function useSite() { return useContext(Ctx); }
