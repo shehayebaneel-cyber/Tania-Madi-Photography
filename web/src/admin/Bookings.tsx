@@ -15,7 +15,7 @@ export const STATUSES = [
 const sLabel = (v: string) => STATUSES.find((s) => s.v === v)?.l || v;
 const sGroup = (v: string) => STATUSES.find((s) => s.v === v)?.g || "prog";
 const GCOL: Record<string, [string, string]> = { new: ["var(--gold)", "#fff"], prog: ["var(--sand)", "var(--ink)"], warn: ["var(--warn-bg)", "var(--warn)"], ok: ["var(--good-bg)", "var(--good)"], done: ["var(--good)", "#fff"], dead: ["var(--crit-bg)", "var(--crit)"] };
-function Pill({ status }: { status: string }) {
+export function Pill({ status }: { status: string }) {
   const [bg, c] = GCOL[sGroup(status)];
   return <span style={{ background: bg, color: c, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{sLabel(status)}</span>;
 }

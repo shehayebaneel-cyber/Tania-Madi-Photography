@@ -6,8 +6,9 @@ import { MediaLibrary } from "../admin/Media";
 import { PortfolioAdmin } from "../admin/Portfolio";
 import { BookingsAdmin, CalendarAdmin } from "../admin/Bookings";
 import { AvailabilityAdmin } from "../admin/Availability";
+import { CustomersAdmin } from "../admin/Customers";
 
-type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "orders" | "editing" | "portfolio" | "media" | "products";
+type Tab = "dashboard" | "bookings" | "calendar" | "availability" | "customers" | "orders" | "editing" | "portfolio" | "media" | "products";
 const EDITING_STATUSES = ["NEW", "REVIEW", "QUOTED", "AWAITING_APPROVAL", "AWAITING_PAYMENT", "EDITING", "PREVIEW", "REVISION", "APPROVED", "DELIVERED", "CANCELLED"];
 const ORDER_STATUSES = ["NEW", "AWAITING_PHOTO_REVIEW", "PHOTO_APPROVED", "AWAITING_PAYMENT", "PRINTING", "FRAMING", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
 
@@ -33,6 +34,7 @@ export default function Admin() {
         {nl("bookings", "Bookings", <Ico d="M8 2v3M16 2v3M3 8h18M4 5h16v16H4z" />)}
         {nl("calendar", "Calendar", <Ico d="M8 2v3M16 2v3M4 5h16v16H4zM3 9h18M8 13h2M14 13h2M8 17h2M14 17h2" />)}
         {nl("availability", "Availability", <Ico d="M12 6v6l4 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" />)}
+        {nl("customers", "Customers", <Ico d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />)}
         {nl("orders", "Orders", <Ico d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />)}
         {nl("editing", "Editing", <Ico d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />)}
         {nl("portfolio", "Portfolio", <Ico d="M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6" />)}
@@ -47,6 +49,7 @@ export default function Admin() {
         {tab === "bookings" && <BookingsAdmin />}
         {tab === "calendar" && <CalendarAdmin />}
         {tab === "availability" && <AvailabilityAdmin />}
+        {tab === "customers" && <CustomersAdmin />}
         {tab === "orders" && <Orders />}
         {tab === "editing" && <Editing />}
         {tab === "portfolio" && <PortfolioAdmin />}

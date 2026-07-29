@@ -117,6 +117,21 @@ async function checkConflict(p: { date?: string; startTime?: string; endTime?: s
   }
   return { warnings, count: sameDay.length };
 }
+// Find an existing customer by email or phone (last 6 digits), else create a
+// contact-only one. Used by every booking/order/editing so the directory stays
+// complete and de-duplicated.
+async function findOrCreateCustomer(c: { name?: string; phone?: string; email?: string; whatsapp?: string; instagram?: string }) {
+  const phone = String(c.phone || "").trim();
+  const email = String(c.email || "").trim().toLowerCase();
+  const digits = phone.replace(/\D/g, "");
+  const conds: any[] = [];
+  if (email) conds.push({ email });
+  if (digits.length >= 6) conds.push({ phone: { contains: digits.slice(-6) } });
+  const found = conds.length ? await prisma.customer.findFirst({ where: { OR: conds } }) : null;
+  if (found) return found;
+  if (!c.name && !phone) return null;
+  return prisma.customer.create({ data: { name: c.name || "Customer", phone, email: email || null, whatsapp: c.whatsapp || "", instagram: c.instagram || "" } });
+}
 
 // ---------- health & settings ----------
 app.get("/api/health", async (_req, res) => {
@@ -204,8 +219,10 @@ app.post("/api/bookings", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Please check the form and try again." });
   const b = parsed.data;
   const service = await prisma.service.findUnique({ where: { slug: b.serviceSlug } });
+  const linked = customerId(req);
+  const cust = linked ? null : await findOrCreateCustomer({ name: b.customerName, phone: b.phone, email: b.email, whatsapp: b.whatsapp, instagram: b.instagram });
   const booking = await prisma.booking.create({
-    data: { ...b, serviceName: service?.name || b.serviceSlug, reference: ref("BK"), source: "website", date: b.preferredDate || "", customerId: customerId(req) ?? undefined },
+    data: { ...b, serviceName: service?.name || b.serviceSlug, reference: ref("BK"), source: "website", date: b.preferredDate || "", customerId: linked ?? cust?.id ?? undefined },
   });
   await logEvent(booking.id, { type: "created", toStatus: booking.status, note: "Website booking request" });
   res.json({ ok: true, reference: booking.reference });
@@ -224,7 +241,9 @@ app.post("/api/editing-requests", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Please check the form and try again." });
   const e = parsed.data;
   const svc = await prisma.editingService.findUnique({ where: { slug: e.serviceSlug } });
-  const r = await prisma.editingRequest.create({ data: { ...e, serviceName: svc?.name || e.serviceSlug, reference: ref("ED"), customerId: customerId(req) ?? undefined } });
+  const eLinked = customerId(req);
+  const eCust = eLinked ? null : await findOrCreateCustomer({ name: e.customerName, phone: e.phone, email: e.email, whatsapp: e.whatsapp });
+  const r = await prisma.editingRequest.create({ data: { ...e, serviceName: svc?.name || e.serviceSlug, reference: ref("ED"), customerId: eLinked ?? eCust?.id ?? undefined } });
   res.json({ ok: true, reference: r.reference });
 });
 
@@ -256,8 +275,10 @@ app.post("/api/orders", async (req, res) => {
     return { productId: p.id, kind: "PRODUCT", name: p.name, options: i.options, uploadUrl: i.uploadUrl, needsEditing: i.needsEditing, instructions: i.instructions, price: unit, qty: i.qty };
   }).filter((x): x is NonNullable<typeof x> => x !== null);
   const deliveryFee = body.fulfilment === "DELIVERY" ? 3 : 0;
+  const oLinked = customerId(req);
+  const oCust = oLinked ? null : await findOrCreateCustomer({ name: body.customerName, phone: body.phone, email: body.email });
   const order = await prisma.order.create({
-    data: { reference: ref("OR"), customerName: body.customerName, phone: body.phone, email: body.email, address: body.address, town: body.town, note: body.note, fulfilment: body.fulfilment, paymentMethod: body.paymentMethod, itemsCost, deliveryFee, total: itemsCost + deliveryFee, customerId: customerId(req) ?? undefined, items: { create: itemsData } },
+    data: { reference: ref("OR"), customerName: body.customerName, phone: body.phone, email: body.email, address: body.address, town: body.town, note: body.note, fulfilment: body.fulfilment, paymentMethod: body.paymentMethod, itemsCost, deliveryFee, total: itemsCost + deliveryFee, customerId: oLinked ?? oCust?.id ?? undefined, items: { create: itemsData } },
   });
   res.json({ ok: true, reference: order.reference, total: order.total });
 });
@@ -376,11 +397,7 @@ app.post("/api/admin/bookings", requireAdmin, async (req, res) => {
   if (!b.customerName || !b.phone) return res.status(400).json({ error: "Customer name and phone are required." });
   const service = b.serviceSlug ? await prisma.service.findUnique({ where: { slug: b.serviceSlug } }) : null;
   let linkId = b.customerId ? Number(b.customerId) : undefined;
-  if (!linkId) {
-    const digits = String(b.phone).replace(/\D/g, "");
-    const existing = digits.length >= 6 ? await prisma.customer.findFirst({ where: { OR: [{ phone: { contains: digits.slice(-6) } }, ...(b.email ? [{ email: String(b.email) }] : [])] } }) : null;
-    if (existing) linkId = existing.id;
-  }
+  if (!linkId) { const cust = await findOrCreateCustomer({ name: b.customerName, phone: b.phone, email: b.email, whatsapp: b.whatsapp, instagram: b.instagram }); linkId = cust?.id; }
   const booking = await prisma.booking.create({ data: {
     reference: ref("BK"), serviceSlug: b.serviceSlug || "", serviceName: service?.name || b.serviceName || b.serviceSlug || "",
     date: b.date || "", preferredDate: b.date || "", startTime: b.startTime || "", endTime: b.endTime || "",
@@ -413,6 +430,49 @@ app.delete("/api/admin/bookings/:id", requireAdmin, async (req, res) => { await 
 app.get("/api/admin/customers-search", requireAdmin, async (req, res) => {
   const q = String(req.query.q || "").trim(); if (q.length < 2) return res.json([]);
   res.json(await prisma.customer.findMany({ where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }] }, take: 8, select: { id: true, name: true, phone: true, email: true, whatsapp: true, instagram: true } }));
+});
+
+// ---------- admin: customers ----------
+app.get("/api/admin/customers", requireAdmin, async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const page = Math.max(1, Number(req.query.page) || 1), pageSize = 20;
+  const where: any = q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }, { instagram: { contains: q, mode: "insensitive" } }] } : {};
+  const [total, rows] = await Promise.all([
+    prisma.customer.count({ where }),
+    prisma.customer.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, include: { _count: { select: { bookings: true, orders: true, editing: true } } } }),
+  ]);
+  res.json({ items: rows.map((c) => ({ id: c.id, name: c.name, phone: c.phone, email: c.email, whatsapp: c.whatsapp, instagram: c.instagram, createdAt: c.createdAt, bookings: c._count.bookings, orders: c._count.orders, editing: c._count.editing, registered: !!c.passwordHash })), total, page, pageSize });
+});
+app.get("/api/admin/customers/:id", requireAdmin, async (req, res) => {
+  const c = await prisma.customer.findUnique({ where: { id: Number(req.params.id) }, include: { bookings: { orderBy: { createdAt: "desc" } }, orders: { orderBy: { createdAt: "desc" }, include: { items: true } }, editing: { orderBy: { createdAt: "desc" } } } });
+  if (!c) return res.status(404).json({ error: "Not found." });
+  const bookingsTotal = c.bookings.reduce((s, b) => s + (b.price || 0), 0);
+  const depositsPaid = c.bookings.reduce((s, b) => s + (b.depositPaid ? (b.deposit || 0) : 0), 0);
+  const ordersTotal = c.orders.reduce((s, o) => s + (o.total || 0), 0);
+  const files: string[] = [];
+  for (const o of c.orders) for (const it of o.items) if (it.uploadUrl) files.push(it.uploadUrl);
+  for (const e of c.editing) if (Array.isArray(e.uploadUrls)) for (const u of e.uploadUrls as string[]) files.push(u);
+  res.json({ ...c, summary: { bookingsTotal, depositsPaid, bookingsOutstanding: bookingsTotal - depositsPaid, ordersTotal, files } });
+});
+app.patch("/api/admin/customers/:id", requireAdmin, async (req, res) => {
+  const data: any = {};
+  for (const k of ["name", "phone", "whatsapp", "instagram", "address", "notes"]) if (typeof req.body?.[k] === "string") data[k] = req.body[k];
+  if (typeof req.body?.email === "string") data.email = req.body.email.trim() || null;
+  res.json(await prisma.customer.update({ where: { id: Number(req.params.id) }, data }));
+});
+app.post("/api/admin/customers", requireAdmin, async (req, res) => {
+  const b = req.body || {}; if (!String(b.name || "").trim()) return res.status(400).json({ error: "Name is required." });
+  const c = await findOrCreateCustomer({ name: b.name, phone: b.phone, email: b.email, whatsapp: b.whatsapp, instagram: b.instagram });
+  if (c && (b.notes || b.address)) await prisma.customer.update({ where: { id: c.id }, data: { notes: b.notes || "", address: b.address || "" } });
+  res.json(c);
+});
+// backfill: link existing bookings/orders/editing that have no customer yet
+app.post("/api/admin/customers/rebuild", requireAdmin, async (_req, res) => {
+  let linked = 0;
+  for (const b of await prisma.booking.findMany({ where: { customerId: null } })) { const c = await findOrCreateCustomer({ name: b.customerName, phone: b.phone, email: b.email, whatsapp: b.whatsapp, instagram: b.instagram }); if (c) { await prisma.booking.update({ where: { id: b.id }, data: { customerId: c.id } }); linked++; } }
+  for (const o of await prisma.order.findMany({ where: { customerId: null } })) { const c = await findOrCreateCustomer({ name: o.customerName, phone: o.phone, email: o.email }); if (c) { await prisma.order.update({ where: { id: o.id }, data: { customerId: c.id } }); linked++; } }
+  for (const e of await prisma.editingRequest.findMany({ where: { customerId: null } })) { const c = await findOrCreateCustomer({ name: e.customerName, phone: e.phone, email: e.email, whatsapp: e.whatsapp }); if (c) { await prisma.editingRequest.update({ where: { id: e.id }, data: { customerId: c.id } }); linked++; } }
+  res.json({ ok: true, linked });
 });
 
 // ---------- availability & conflict prevention ----------

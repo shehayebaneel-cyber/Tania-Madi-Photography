@@ -58,13 +58,14 @@ model Media {
 
 model Customer {
   id           Int              @id @default(autoincrement())
-  email        String           @unique
-  passwordHash String
+  email        String?          @unique // null for contact-only (walk-in) customers
+  passwordHash String           @default("") // empty = contact-only, no login
   name         String
   phone        String           @default("")
   whatsapp     String           @default("")
   instagram    String           @default("")
   address      String           @default("")
+  notes        String           @default("") // internal notes
   bookings     Booking[]
   orders       Order[]
   editing      EditingRequest[]
